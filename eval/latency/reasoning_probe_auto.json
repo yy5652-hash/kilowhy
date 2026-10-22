@@ -1,0 +1,122 @@
+{
+  "generatedAt": "2026-10-22T02:36:03.893Z",
+  "mode": "auto",
+  "direct": false,
+  "promptChars": 7598,
+  "repeats": 2,
+  "summary": [
+    {
+      "variant": "baseline",
+      "n": 2,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 1,
+      "medianWallMs": 30554,
+      "medianOutputTokens": 1852,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "meterless"
+      ]
+    },
+    {
+      "variant": "cap500",
+      "n": 2,
+      "okRate": 1,
+      "jsonRate": 0,
+      "leakRate": 0,
+      "medianWallMs": 6184,
+      "medianOutputTokens": 500,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "meterless"
+      ]
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "n": 2,
+      "okRate": 1,
+      "jsonRate": 0,
+      "leakRate": 0,
+      "medianWallMs": 7801,
+      "medianOutputTokens": 500,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "meterless"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 34261,
+      "outputTokens": 1558,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for all three sites. This is a \"what_to_ch"
+    },
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 26847,
+      "outputTokens": 2145,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for all three sites. This is a \"what_to_ch"
+    },
+    {
+      "variant": "cap500",
+      "ok": true,
+      "wallMs": 6183,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for all three sites. This is a \"what_to_ch"
+    },
+    {
+      "variant": "cap500",
+      "ok": true,
+      "wallMs": 6184,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for all three sites. This is a \"what_to_ch"
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 7802,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites. This is a \"what_to_change"
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 7799,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites. This is a \"what_to_change"
+    }
+  ]
+}

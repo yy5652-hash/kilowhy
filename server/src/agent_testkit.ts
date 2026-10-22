@@ -31,54 +31,65 @@ export const stepOf = (req: ChatRequest): Step => {
   return sys.startsWith("You classify") ? "intent" : sys.startsWith("You plan") ? "plan" : "narrative";
 };
 
-export interface FactLine { id: string; hyp: string; label: string; display: string; evidence: string }
-/** Reads the facts table back out of a narrative prompt (the model sees exactly this). */
+export interface FactLine { id: string; hyp: string; label: string; display: string }
+/** Reads the facts table back out of a narrative prompt (the model sees exactly this): "F9 [H1] label = display". */
 export function factLines(req: ChatRequest): FactLine[] {
   const sys = String(req.messages[0].content);
-  return sys.split("\n").filter((l) => /^F\d+ \| /.test(l)).map((l) => { const [id, hyp, label, display, evidence] = l.split(" | "); return { id, hyp, label, display, evidence }; });
+  return sys.split("\n").filter((l) => /^F\d+ /.test(l)).map((l) => {
+    const m = l.match(/^(F\d+)(?: \[(\w+)\])? (.*) = ([^=]*)$/)!;
+    return { id: m[1], hyp: m[2] ?? "-", label: m[3], display: m[4] };
+  });
 }
 export const lineBy = (lines: FactLine[], labelStart: string): FactLine => {
   const f = lines.find((l) => l.label.startsWith(labelStart));
   if (!f) throw new Error(`no fact starting with "${labelStart}"`);
   return f;
 };
+/** The placeholder of the fact whose label starts with `labelStart`, e.g. "{F9}". */
+export const ph = (lines: FactLine[], labelStart: string, abs = false): string => `{${lineBy(lines, labelStart).id}${abs ? ":abs" : ""}}`;
 
 export const INTENT_OK = (over: object = {}) => JSON.stringify({ type: "why_cost_change", sites: [], dates: [], ...over });
-export const PLAN_OK = (over: object = {}) => JSON.stringify({ hypotheses: ["H1", "H2", "H3", "H4", "H5", "H6", "H11"], extraSql: [], rationale: "Test the usual suspects.", ...over });
+export const PLAN_OK = (over: object = {}) => JSON.stringify({ hypotheses: ["H1", "H2", "H3", "H4", "H5", "H6", "H11"], extraSql: [], ...over });
 
-/** A narrative whose every number is a verbatim display of a cited fact (valid for the scenario above, where H3 is supported). */
+/** A placeholder narrative (no digits) that is valid for the scenario above, where H3 is supported and H5 is ruled out. */
 export function goodNarrative(req: ChatRequest): string {
   const L = factLines(req);
-  const bill = ["Change in the bill, window", "Change in the bill as a share", "Electricity bill in window A", "Electricity bill in window B"].map((p) => lineBy(L, p));
-  const w = ["Weather part of the volume effect", "Weather part as a share"].map((p) => lineBy(L, p));
-  const rec = lineBy(L, "Load shift: money saved");
-  const flat = lineBy(L, "Flat tariff minus Agile in window B");
-  const t = lineBy(L, "Timing effect T:"), ts = lineBy(L, "Timing effect T as a share");
+  const p = (s: string, abs = false) => ph(L, s, abs);
   return JSON.stringify({
-    headline: `Your bill rose by ${bill[0].display}`,
+    headline: `Your bill rose by ${p("Change in the bill, window")}`,
     sentences: [
-      { text: `Your bill rose by ${bill[0].display} (${bill[1].display}), from ${bill[2].display} to ${bill[3].display}.`, facts: bill.map((b) => b.id), evidence: [...new Set(bill.map((b) => b.evidence))] },
-      { text: `Colder weather added ${w[0].display} (${w[1].display} of the change).`, facts: w.map((b) => b.id), evidence: [w[0].evidence] },
+      { text: `Your bill rose by ${p("Change in the bill, window")} (${p("Change in the bill as a share")}), from ${p("Electricity bill in window A")} to ${p("Electricity bill in window B")}.` },
+      { text: `Colder weather added ${p("Weather part of the volume effect")} (${p("Weather part as a share")} of the change).` },
     ],
-    ruledOut: [{ hypothesis: "H5", text: `Timing is ruled out: it moved the bill by only ${t.display} (${ts.display}).`, facts: [t.id, ts.id], evidence: [t.evidence] }],
-    recommendation: { text: `On window B prices, load shifting would have saved ${rec.display}; as a historical counterfactual, the flat tariff would have cost ${flat.display} more.`, facts: [rec.id, flat.id], evidence: [rec.evidence, flat.evidence] },
+    ruledOut: [{ hypothesis: "H5", text: `Timing is ruled out: it moved the bill by only ${p("Timing effect T:")} (${p("Timing effect T as a share")}).` }],
+    recommendation: { text: `On window B prices, load shifting would have saved ${p("Load shift: money saved")}; as a historical counterfactual, the flat tariff would have cost ${p("Flat tariff minus Agile in window B")} more.` },
   });
 }
 
-/** Scripted fake LLM: `script` maps a step to the list of replies for its successive calls (the last one repeats). Records every request. */
-export function fakeChat(script: Partial<Record<Step, (string | ((req: ChatRequest) => string) | Error)[]>>): ChatFn & { requests: { step: Step; req: ChatRequest }[] } {
+/** goodNarrative with one figure written as digits that no fact has: the placeholder check rejects it. */
+export function badNarrative(req: ChatRequest): string {
+  const n = JSON.parse(goodNarrative(req));
+  n.sentences[1].text = `Colder weather added £999.99 (${ph(factLines(req), "Weather part as a share")} of the change).`;
+  return JSON.stringify(n);
+}
+
+/** Scripted fake LLM: `script` maps a step to the list of replies for its successive calls (the last one repeats). Records every request with its start and end time. */
+export function fakeChat(script: Partial<Record<Step, (string | ((req: ChatRequest) => string) | Error)[]>>, delaysMs: Partial<Record<Step, number>> = {}) {
   const used: Record<string, number> = {};
-  const requests: { step: Step; req: ChatRequest }[] = [];
+  const requests: { step: Step; req: ChatRequest; startedAt: number; endedAt: number }[] = [];
   const fn = async (req: ChatRequest): Promise<ChatResult> => {
     const step = stepOf(req);
-    requests.push({ step, req });
+    const rec = { step, req, startedAt: performance.now(), endedAt: 0 };
+    requests.push(rec);
     const list = script[step] ?? [];
     const n = used[step] ?? 0;
     used[step] = n + 1;
     const item = list[Math.min(n, list.length - 1)];
+    if (delaysMs[step]) await new Promise((r) => setTimeout(r, delaysMs[step]));
+    rec.endedAt = performance.now();
     if (item === undefined) throw new Error(`no scripted reply for ${step}`);
     if (item instanceof Error) throw item;
     return reply(typeof item === "function" ? item(req) : item, step === "intent" ? "auto" : "deep");
   };
-  return Object.assign(fn, { requests });
+  return Object.assign(fn as ChatFn, { requests });
 }

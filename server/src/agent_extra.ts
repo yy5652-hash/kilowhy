@@ -5,7 +5,7 @@ import { makeEvidence, type EvidenceSource, type EvidenceStore, type Row, type S
 import type { ZSql } from "./data.ts";
 import type { ExtraSql } from "./agent_types.ts";
 
-export const MAX_EXTRA_SQL = 2;
+export const MAX_EXTRA_SQL = 1;
 const KINDS: Record<string, SourceKind> = {
   agile_rates: "REST: Octopus", agile_standing: "REST: Octopus", flat_tariff: "REST: Octopus", ci_london: "REST: NESO", fuel_hh: "REST: Elexon", temp_hourly: "REST: Open-Meteo",
   meter_hh: "FILE: sample", sites: "FILE: sample", ops_log: "FILE: sample", contract: "FILE: sample",

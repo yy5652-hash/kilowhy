@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { askJson, correctiveMessage, type Checked } from "./agent_llm.ts";
 import { fakeChat, INTENT_OK } from "./agent_testkit.ts";
-import { checkIntent, checkPlan, checkNarrative } from "./agent_prompts.ts";
+import { checkIntent, checkPlan, checkNarrativeShape } from "./agent_prompts.ts";
 import type { LlmCall } from "./agent_types.ts";
 
 const msgs = [{ role: "system" as const, content: "You classify x" }, { role: "user" as const, content: "q" }];
@@ -40,6 +40,14 @@ describe("askJson", () => {
     assert.match(String(second[second.length - 1].content), /ONE valid JSON object/);
     assert.equal(second[second.length - 2].content, "I think it is about cost.");
   });
+  it("records why a rejected reply was unusable, with the start and end of its text and its token count", async () => {
+    const calls: LlmCall[] = [];
+    await intentStep(fakeChat({ intent: ["The user wants me to classify the question. " + "x".repeat(300) + " then I will answer", INTENT_OK()] }), calls);
+    assert.equal(calls.length, 2);
+    assert.match(calls[0].rejected!, /^it contained no JSON object; \? output tokens; starts "The user wants me to classify/);
+    assert.match(calls[0].rejected!, /ends "x*  ?then I will answer"$|then I will answer"$/);
+    assert.equal(calls[1].rejected, undefined);
+  });
   it("retries once when the JSON has the wrong shape, and names the problem", async () => {
     const calls: LlmCall[] = [];
     const chat = fakeChat({ intent: [JSON.stringify({ type: "poetry" }), INTENT_OK()] });
@@ -61,8 +69,39 @@ describe("askJson", () => {
     const r = await intentStep(chat, calls);
     assert.equal(r.value, null);
     assert.equal(r.rawText, undefined);
-    assert.deepEqual(calls, [{ step: "intent", error: "meterless HTTP 502" }]);
+    assert.equal(calls.length, 1); assert.equal(calls[0].step, "intent"); assert.equal(calls[0].error, "meterless HTTP 502"); assert.equal(typeof calls[0].wallMs, "number");
     assert.equal(chat.requests.length, 1);
+  });
+  it("passes the token cap, the deadline and the reasoning control to the model call and reports each call", async () => {
+    const calls: LlmCall[] = [], seen: LlmCall[] = [];
+    const chat = fakeChat({ intent: [INTENT_OK()] });
+    await askJson({ chat, calls, onCall: (c) => seen.push(c), reasoning: { systemLine: "/no_think", extra: { chat_template_kwargs: { enable_thinking: false } } } }, "intent", "auto", msgs, checkIntent, { maxTokens: 120, deadlineMs: 20_000 });
+    const req = chat.requests[0].req;
+    assert.equal(req.max_tokens, 120); assert.equal(req.deadlineMs, 20_000); assert.deepEqual(req.extra, { chat_template_kwargs: { enable_thinking: false } });
+    assert.equal(req.messages[0].content, "You classify x\n/no_think");
+    assert.equal(seen.length, 1); assert.equal(seen[0].step, "intent");
+  });
+  it("without options nothing extra is sent", async () => {
+    const chat = fakeChat({ intent: [INTENT_OK()] });
+    await intentStep(chat, []);
+    const req = chat.requests[0].req;
+    assert.equal("max_tokens" in req, false); assert.equal("deadlineMs" in req, false); assert.equal("extra" in req, false);
+    assert.equal(req.messages[0].content, "You classify x");
+  });
+  it("retryTransient: one more try after a quick 429, none after a timeout or when not asked", async () => {
+    const calls: LlmCall[] = [];
+    const chat = fakeChat({ intent: [new Error("nvidia HTTP 429: Too Many Requests"), INTENT_OK()] });
+    const r = await askJson({ chat, calls }, "intent", "auto", msgs, checkIntent, { retryTransient: true });
+    assert.equal(r.value?.type, "why_cost_change");
+    assert.equal(calls.length, 2); assert.equal(calls[0].error, "nvidia HTTP 429: Too Many Requests"); assert.match(calls[1].step, /^intent \(retry after/);
+    const timeout = fakeChat({ intent: [new Error("meterless timeout after 30s"), INTENT_OK()] });
+    assert.equal((await askJson({ chat: timeout, calls: [] }, "intent", "auto", msgs, checkIntent, { retryTransient: true })).value, null);
+    assert.equal(timeout.requests.length, 1);
+    const notAsked = fakeChat({ intent: [new Error("nvidia HTTP 429"), INTENT_OK()] });
+    assert.equal((await askJson({ chat: notAsked, calls: [] }, "intent", "auto", msgs, checkIntent)).value, null);
+    const twice = fakeChat({ intent: [new Error("nvidia HTTP 503"), new Error("nvidia HTTP 503")] });
+    assert.equal((await askJson({ chat: twice, calls: [] }, "intent", "auto", msgs, checkIntent, { retryTransient: true })).value, null);
+    assert.equal(twice.requests.length, 2);
   });
   it("the original messages are never mutated", async () => {
     const before = JSON.stringify(msgs);
@@ -86,17 +125,17 @@ describe("reply checkers", () => {
     assert.deepEqual(c.value.extraSql, [{ purpose: "p", sql: "SELECT 1" }, { purpose: "extra query", sql: "SELECT 2" }]);
     assert.equal(checkPlan({ rationale: "x" }).ok, false);
   });
-  it("checkNarrative: coerces ids (12, '[F12]', 'f12'), defaults missing sections, rejects missing sentences", () => {
-    const c = checkNarrative({ headline: " h ", sentences: [{ text: "A.", facts: [12, "[F13]", "f14"], evidence: "E1, e2" }] }) as Extract<Checked<any>, { ok: true }>;
+  it("checkNarrativeShape: needs a sentences array of {text}; the other sections are left to narration.ts", () => {
+    const c = checkNarrativeShape({ headline: "h", sentences: [{ text: "A {F1}." }], ruledOut: [{ hypothesis: "H5", text: "x {F2}" }], recommendation: { text: "r {F3}" } }) as Extract<Checked<any>, { ok: true }>;
     assert.equal(c.ok, true);
-    assert.deepEqual(c.value.sentences[0].facts, ["F12", "F13", "F14"]);
-    assert.deepEqual(c.value.sentences[0].evidence, ["E1", "E2"]);
-    assert.deepEqual(c.value.ruledOut, []);
-    assert.deepEqual(c.value.recommendation, { text: "", facts: [], evidence: [] });
-    assert.equal(c.value.headline, "h");
-    assert.equal(checkNarrative({ headline: "x" }).ok, false);
-    assert.equal(checkNarrative({ sentences: [{ facts: [] }] }).ok, false);
-    assert.equal(checkNarrative({ sentences: [], ruledOut: [{ text: 1 }] }).ok, false);
+    assert.equal(c.value.sentences.length, 1);
+    const loose = checkNarrativeShape({ sentences: ["A {F1}.", { text: "B {F2}." }], ruledOut: ["C {F3}"], recommendation: "D {F4}" }) as Extract<Checked<any>, { ok: true }>;
+    assert.equal(loose.ok, true);
+    assert.deepEqual(loose.value.sentences, [{ text: "A {F1}." }, { text: "B {F2}." }]); assert.deepEqual(loose.value.ruledOut, [{ text: "C {F3}" }]); assert.deepEqual(loose.value.recommendation, { text: "D {F4}" });
+    assert.equal(checkNarrativeShape({ headline: "x" }).ok, false);
+    assert.equal(checkNarrativeShape({ sentences: [{ facts: [] }] }).ok, false);
+    assert.equal(checkNarrativeShape(null).ok, false);
+    assert.equal(checkNarrativeShape({ sentences: [] }).ok, true, "an empty list is a content problem, reported by narration.ts");
   });
-  it("correctiveMessage lists every error", () => { const m = correctiveMessage(["a", "b"]); assert.match(m, /- a\n- b/); assert.match(m, /verifier rejected/); });
+  it("correctiveMessage lists every error", () => { const m = correctiveMessage(["a", "b"]); assert.match(m, /- a\n- b/); assert.match(m, /rejected for these reasons/); assert.match(m, /Never write digits/); });
 });

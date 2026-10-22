@@ -30,6 +30,7 @@ const NVIDIA_CHAT_MODELS: Record<Mode, string[]> = {
   fast: [LIGHTNING],
   auto: [LIGHTNING],
 };
+const RATE_LIMIT_PAUSE_MS = 2_000;
 const NVIDIA_EMBED_MODEL = "nvidia/nemotron-3-embed-1b";
 const DEFAULT_TOKEN_PATH = `${homedir()}/Library/Application Support/ai.meterless.runtime/proxy-token`;
 const DEFAULT_LOG_PATH = fileURLToPath(new URL("../../data/cache/llm-calls.jsonl", import.meta.url));
@@ -110,22 +111,31 @@ export function createProvider(cfg: ProviderConfig = {}) {
     };
   };
 
-  async function postJson(label: string, url: string, headers: Record<string, string>, body: unknown) {
+  async function postJson(label: string, url: string, headers: Record<string, string>, body: unknown, limitMs: number = timeoutMs, cancel?: AbortSignal) {
+    const timer = AbortSignal.timeout(limitMs);
+    const signal = cancel ? AbortSignal.any([timer, cancel]) : timer;
+    const limit = limitMs >= 1000 ? `${Math.round(limitMs / 100) / 10}s`.replace(".0s", "s") : `${limitMs}ms`;
     let res: Response;
     try {
-      res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
+      res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
     } catch (e: any) {
+      if (cancel?.aborted && !timer.aborted) throw new UpstreamError(`${label} request cancelled`, null, true);
       const timedOut = e?.name === "TimeoutError" || e?.name === "AbortError";
-      const why = timedOut ? `timeout after ${Math.round(timeoutMs / 1000)}s` : `network error (${e?.cause?.code ?? e?.message ?? "fetch failed"})`;
+      const why = timedOut ? `timeout after ${limit}` : `network error (${e?.cause?.code ?? e?.message ?? "fetch failed"})`;
       throw new UpstreamError(`${label} ${why}`, null, true);
     }
     const text = await res.text().catch(() => "");
+    if (cancel?.aborted && !timer.aborted) throw new UpstreamError(`${label} request cancelled`, null, true);
+    if (signal.aborted) throw new UpstreamError(`${label} timeout after ${limit} (while reading the reply)`, null, true);
     let json: any = null;
     try { json = JSON.parse(text); } catch { /* non-JSON body */ }
     if (!res.ok) {
       const detail = redact(str(json?.error?.message) ?? text.slice(0, 200));
       const retryable = res.status >= 500 || [401, 403, 408, 429].includes(res.status);
-      throw new UpstreamError(`${label} HTTP ${res.status}${detail ? `: ${detail}` : ""}`, res.status, retryable);
+      const err = new UpstreamError(`${label} HTTP ${res.status}${detail ? `: ${detail}` : ""}`, res.status, retryable);
+      const wait = Number(res.headers.get("retry-after"));
+      if (Number.isFinite(wait) && wait > 0) err.retryAfterMs = wait * 1000;
+      throw err;
     }
     if (json === null) throw new UpstreamError(`${label} returned a non-JSON body`, res.status, true);
     return json;
@@ -188,6 +198,7 @@ export function createProvider(cfg: ProviderConfig = {}) {
 
   function chatBody(model: string, req: ChatRequest) {
     return {
+      ...(req.extra ?? {}),
       model, messages: req.messages,
       ...(req.tools ? { tools: req.tools } : {}),
       ...(req.tool_choice !== undefined ? { tool_choice: req.tool_choice } : {}),
@@ -204,10 +215,10 @@ export function createProvider(cfg: ProviderConfig = {}) {
     return { content: cleanContent(rawContent), rawContent, toolCalls, route: { ...route, latencyMs: Date.now() - t0 } };
   }
 
-  async function chatViaMeterless(base: string, req: ChatRequest, mode: Mode): Promise<ChatResult> {
+  async function chatViaMeterless(base: string, req: ChatRequest, mode: Mode, cancel?: AbortSignal): Promise<ChatResult> {
     const t0 = Date.now();
     const requestedModel = `meterless/${mode}`;
-    const json = await postJson("meterless", `${base}/chat/completions`, meterlessHeaders(), chatBody(requestedModel, req));
+    const json = await postJson("meterless", `${base}/chat/completions`, meterlessHeaders(), chatBody(requestedModel, req), req.deadlineMs, cancel);
     const r = json.meterless ?? {};
     const win = r.winning_route ?? {};
     return toResult(json, {
@@ -216,24 +227,35 @@ export function createProvider(cfg: ProviderConfig = {}) {
       label: str(win.label), kind: str(win.kind), tier: str(win.tier),
       receiptId: str(r.receipt_id),
       raceWidth: num(r.receipt?.app_policy?.race_width) ?? num(r.app_policy?.race_width),
-      usage: usageOf(json),
+      usage: usageOf(json), ...(r.from_cache === true ? { fromCache: true } : {}),
     }, t0);
   }
 
-  async function nvidiaPost(path: string, body: unknown) {
+  async function nvidiaPost(path: string, body: unknown, limitMs?: number, cancel?: AbortSignal) {
     const key = nvidiaKey();
     if (!key) throw new ProviderError("NVIDIA API key not found (set NVIDIA_API_KEY or keychain item kilowhy/NVIDIA_API_KEY)");
-    return postJson("nvidia", `${nvidiaBase}${path}`, { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body);
+    return postJson("nvidia", `${nvidiaBase}${path}`, { "Content-Type": "application/json", Authorization: `Bearer ${key}` }, body, limitMs, cancel);
   }
 
-  async function chatViaNvidia(req: ChatRequest, mode: Mode, fallbackReason: string): Promise<ChatResult> {
+  async function chatViaNvidia(req: ChatRequest, mode: Mode, fallbackReason: string, cancel?: AbortSignal): Promise<ChatResult> {
     const t0 = Date.now();
     const chain = NVIDIA_CHAT_MODELS[mode];
     const candidates = chain.filter((m) => !unavailableModels.has(m));
     const skipped = chain.filter((m) => unavailableModels.has(m));
     for (const [i, model] of (candidates.length ? candidates : chain).entries()) {
       try {
-        const json = await nvidiaPost("/chat/completions", chatBody(model, req));
+        let json: any;
+        try { json = await nvidiaPost("/chat/completions", chatBody(model, req), req.deadlineMs, cancel); }
+        catch (e: any) {
+          if (!(e instanceof UpstreamError) || e.status !== 429 || cancel?.aborted) throw e;
+          // a rate limit: wait as long as Retry-After says (default 2 s, at most 5 s), try again, and once more after twice that
+          let waited = Math.min(e.retryAfterMs ?? RATE_LIMIT_PAUSE_MS, 5000);
+          for (let n = 0; ; n++) {
+            await new Promise((r) => setTimeout(r, waited));
+            try { json = await nvidiaPost("/chat/completions", chatBody(model, req), req.deadlineMs, cancel); break; }
+            catch (e2: any) { if (n >= 1 || !(e2 instanceof UpstreamError) || e2.status !== 429 || cancel?.aborted) throw e2; waited = Math.min(waited * 2, 5000); }
+          }
+        }
         const note = skipped.map((m) => `${m.split("/")[1]} not available on this NVIDIA account (404)`).join("; ");
         return toResult(json, {
           provider: "nvidia-direct", requestedModel: model, routedModel: str(json.model) ?? model,
@@ -248,6 +270,23 @@ export function createProvider(cfg: ProviderConfig = {}) {
       }
     }
     throw new ProviderError("no NVIDIA chat model configured"); // unreachable: every chain is non-empty
+  }
+
+  /** Meterless first; if it is still running after `req.hedgeAfterMs`, the labelled NVIDIA call starts alongside it. First answer wins, the other call is cancelled. */
+  function chatHedged(base: string, req: ChatRequest, mode: Mode, hedgeMs: number): Promise<ChatResult> {
+    const ctlA = new AbortController(), ctlB = new AbortController();
+    return new Promise<ChatResult>((resolve, reject) => {
+      let done = false, bStarted = false, aDone = false, bDone = false, aErr: unknown, bErr: unknown;
+      const win = (r: ChatResult) => { if (done) return; done = true; clearTimeout(timer); ctlA.abort(); ctlB.abort(); resolve(r); };
+      const lose = () => { if (done || !aDone || (bStarted && !bDone)) return; done = true; clearTimeout(timer); reject(bStarted ? new ProviderError(`${(aErr as Error)?.message ?? aErr}; the alongside NVIDIA call failed too: ${(bErr as Error)?.message ?? bErr}`) : aErr); };
+      chatViaMeterless(base, req, mode, ctlA.signal).then(win, (e) => { aErr = e; aDone = true; lose(); });
+      const timer = setTimeout(() => {
+        if (done || aDone) return;
+        bStarted = true;
+        const why = `meterless had not answered after ${hedgeMs >= 1000 ? `${Math.round(hedgeMs / 100) / 10}s`.replace(".0s", "s") : `${hedgeMs}ms`}; the labelled fallback was started alongside`;
+        chatViaNvidia(req, mode, why, ctlB.signal).then(win, (e) => { bErr = e; bDone = true; lose(); });
+      }, hedgeMs);
+    });
   }
 
   function failure(e: any, reason: string): ProviderError {
@@ -265,10 +304,12 @@ export function createProvider(cfg: ProviderConfig = {}) {
     const hash = sha256(req.messages);
     let reason = "";
     try {
-      const det = await detectMeterless();
-      if (det.status === "online" && det.baseUrl) {
+      if (req.direct && !fallbackOn) throw unavailable(`direct NVIDIA call requested: ${req.direct}`);
+      const det = req.direct ? ({ status: "offline", baseUrl: null, modes: [] } as Detection) : await detectMeterless();
+      if (req.direct) reason = req.direct;
+      else if (det.status === "online" && det.baseUrl) {
         try {
-          const result = await chatViaMeterless(det.baseUrl, req, mode);
+          const result = req.hedgeAfterMs && fallbackOn ? await chatHedged(det.baseUrl, req, mode, req.hedgeAfterMs) : await chatViaMeterless(det.baseUrl, req, mode);
           record("chat", mode, hash, t0, { route: result.route });
           return result;
         } catch (e: any) {

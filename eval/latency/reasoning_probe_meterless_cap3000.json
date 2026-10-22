@@ -1,0 +1,204 @@
+{
+  "generatedAt": "2026-10-22T02:41:32.103Z",
+  "mode": "deep",
+  "direct": false,
+  "promptChars": 7598,
+  "repeats": 3,
+  "summary": [
+    {
+      "variant": "baseline",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 1,
+      "medianWallMs": 26089,
+      "medianOutputTokens": 1279,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "meterless"
+      ]
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 0.6666666666666666,
+      "medianWallMs": 13827,
+      "medianOutputTokens": 1272,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b",
+        "nvidia/nemotron-3.5-super-vl-120b-a12b"
+      ],
+      "providers": [
+        "meterless"
+      ]
+    },
+    {
+      "variant": "kwargs_and_line",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 1,
+      "medianWallMs": 14520,
+      "medianOutputTokens": 1272,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "meterless"
+      ]
+    },
+    {
+      "variant": "thinking_disabled",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 1,
+      "medianWallMs": 15477,
+      "medianOutputTokens": 1300,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "meterless"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 17247,
+      "outputTokens": 1279,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites. This is a \"what_to_change"
+    },
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 27256,
+      "outputTokens": 1272,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites. This is a \"what_to_change"
+    },
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 26089,
+      "outputTokens": 1832,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites. This is a \"what_to_change"
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 13827,
+      "outputTokens": 1272,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites. This is a \"what_to_change"
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 20662,
+      "outputTokens": 1300,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites: S1 Crumb & Co Shoreditch,"
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 8770,
+      "outputTokens": 1272,
+      "routedModel": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "{\"headline\": \"Bill up £{F9:abs} ({F10}); price level the main driver, but load shifting and a freeze"
+    },
+    {
+      "variant": "kwargs_and_line",
+      "ok": true,
+      "wallMs": 17846,
+      "outputTokens": 1272,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites. This is a \"what_to_change"
+    },
+    {
+      "variant": "kwargs_and_line",
+      "ok": true,
+      "wallMs": 14296,
+      "outputTokens": 1272,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites. This is a \"what_to_change"
+    },
+    {
+      "variant": "kwargs_and_line",
+      "ok": true,
+      "wallMs": 14520,
+      "outputTokens": 1300,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites: S1 Crumb & Co Shoreditch,"
+    },
+    {
+      "variant": "thinking_disabled",
+      "ok": true,
+      "wallMs": 15477,
+      "outputTokens": 1272,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites. This is a \"what_to_change"
+    },
+    {
+      "variant": "thinking_disabled",
+      "ok": true,
+      "wallMs": 13637,
+      "outputTokens": 1300,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites: S1 Crumb & Co Shoreditch,"
+    },
+    {
+      "variant": "thinking_disabled",
+      "ok": true,
+      "wallMs": 15650,
+      "outputTokens": 1300,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true,
+      "provider": "meterless",
+      "preview": "The user is asking \"What should we change to save money?\" for three sites: S1 Crumb & Co Shoreditch,"
+    }
+  ]
+}

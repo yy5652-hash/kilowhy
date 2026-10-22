@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-22T02:08:11.984Z",
+  "generatedAt": "2026-10-22T03:49:26.833Z",
   "question": "Why did Brixton use more electricity?",
   "intent": {
     "type": "why_cost_change",
@@ -66,39 +66,22 @@
   },
   "plan": {
     "hypotheses": [
-      "H1",
-      "H2",
       "H3",
       "H4",
       "H6",
-      "H5",
       "H11",
-      "H7",
+      "H1",
+      "H5",
       "H8",
-      "H9"
-    ],
-    "added": [
+      "H2",
       "H7",
-      "H8",
-      "H9"
+      "H9",
+      "H10"
     ],
+    "added": [],
     "dropped": [],
-    "extraSql": [
-      {
-        "purpose": "Get daily kWh and heating degree days for Brixton (S2) across both windows to visually assess weather impact",
-        "sql": "WITH daily AS (\n  SELECT \n    CAST(m.ts AS DATE) AS d,\n    SUM(m.kwh) AS daily_kwh,\n    AVG(t.temp_c) AS avg_temp_c\n  FROM kilowhy.meter_hh m\n  LEFT JOIN kilowhy.temp_hourly t ON CAST(m.ts AS DATE) = CAST(t.ts AS DATE) AND HOUR(m.ts) = HOUR(t.ts)\n  WHERE m.site_id = 'S2'\n    AND m.ts >= (SELECT date_sub(CAST(MAX(ts) AS DATE), 56) FROM kilowhy.meter_hh WHERE site_id = 'S2')\n  GROUP BY CAST(m.ts AS DATE)\n)\nSELECT d, daily_kwh, avg_temp_c,\n       GREATEST(15.5 - avg_temp_c, 0) AS hdd\nFROM daily\nORDER BY d\nLIMIT 5000",
-        "status": "failed",
-        "reason": "Zetaris HTTP 400: {\"msg\":\"[MISSING_ATTRIBUTES.RESOLVED_ATTRIBUTE_APPEAR_IN_OPERATION] Resolved attribute(s) \\\"site_id\\\", \\\"ts\\\", \\\"kwh\\\" missing from \\\"site_id\\\", \\\"ts\\\", \\\"kwh\\\" in operator !Project [site_id#169868, t"
-      },
-      {
-        "purpose": "Get operational log events for Brixton (S2) during the two windows to identify potential non-weather volume drivers",
-        "sql": "SELECT event_id, event_date, description\nFROM kilowhy.ops_log\nWHERE site_id = 'S2'\n  AND event_date >= (SELECT date_sub(CAST(MAX(ts) AS DATE), 56) FROM kilowhy.meter_hh WHERE site_id = 'S2')\nORDER BY event_date\nLIMIT 5000",
-        "status": "ran",
-        "evidence": "E18",
-        "rows": 1
-      }
-    ],
-    "rationale": "The bill increase is driven by both higher unit prices (£57.84) and increased consumption (£45.80); hypotheses are ordered to test price drivers first, then volume drivers including weather, operational events, one-off days, timing shifts, and anomalous site-days.",
+    "extraSql": [],
+    "rationale": "ordered by the model",
     "source": "llm"
   },
   "results": [
@@ -246,63 +229,6 @@
       }
     },
     {
-      "id": "H6",
-      "name": "one_off_day",
-      "status": "supported",
-      "headline": "top day 2026-10-17 = 31% of change (+£32.40); average price on baseline day 2026-09-19 (window A) is 2.6 sd below its window mean",
-      "summary": {
-        "top_day": "2026-10-17",
-        "top_day_share": 0.3096,
-        "top_day_delta_gbp": 32.4,
-        "driver": "price_A",
-        "opposite_day": "2026-10-09",
-        "opposite_day_share": -0.1913,
-        "opposite_driver": "price_B",
-        "anomalous_day": "2026-09-21",
-        "anomalous_day_z": 2.65,
-        "anomalous_day_excess_kwh": 5.15
-      },
-      "evidence": [
-        "E1",
-        "E9",
-        "E10"
-      ],
-      "notes": [
-        "rule: top day >= 25% of the total change (largest day in the direction of the change)",
-        "top day 2026-10-17 (partner baseline day 2026-09-19): average price on baseline day 2026-09-19 (window A) is 2.6 sd below its window mean; also: heating degree days on 2026-10-17 (window B) 1.9 sd, usage on 2026-10-17 (window B) 1.8 sd",
-        "most unusual day by weather- and weekday-adjusted daily kWh: 2026-09-21, +5.1 kWh vs the model (2.6 sd)",
-        "largest day against the direction of the change: 2026-10-09 (-£20.02, 19% of the total); average price on 2026-10-09 (window B) is 2.8 sd below its window mean"
-      ],
-      "details": {
-        "top": {
-          "share": 0.3095716698105027,
-          "date": "2026-10-17",
-          "deltaPence": 3240.3287000000005,
-          "totalPence": 10467.135775
-        },
-        "opposite": {
-          "date": "2026-10-09",
-          "deltaPence": -2002.1822255000002,
-          "share": -0.19128272227843535
-        },
-        "topDriver": {
-          "kind": "price_A",
-          "label": "average price on baseline day 2026-09-19 (window A)",
-          "z": -2.607998169678819
-        },
-        "oppositeDriver": {
-          "kind": "price_B",
-          "label": "average price on 2026-10-09 (window B)",
-          "z": -2.770731109231629
-        },
-        "anomaly": {
-          "date": "2026-09-21",
-          "excessKwh": 5.145874514352393,
-          "z": 2.648893964579955
-        }
-      }
-    },
-    {
       "id": "H5",
       "name": "timing_shift",
       "status": "ruled_out",
@@ -327,8 +253,8 @@
       },
       "evidence": [
         "E1",
-        "E11",
-        "E12"
+        "E9",
+        "E10"
       ],
       "notes": [
         "rule: |T| >= 10% of |change| (supported), else ruled out",
@@ -386,6 +312,180 @@
       }
     },
     {
+      "id": "H6",
+      "name": "one_off_day",
+      "status": "supported",
+      "headline": "top day 2026-10-17 = 31% of change (+£32.40); average price on baseline day 2026-09-19 (window A) is 2.6 sd below its window mean",
+      "summary": {
+        "top_day": "2026-10-17",
+        "top_day_share": 0.3096,
+        "top_day_delta_gbp": 32.4,
+        "driver": "price_A",
+        "opposite_day": "2026-10-09",
+        "opposite_day_share": -0.1913,
+        "opposite_driver": "price_B",
+        "anomalous_day": "2026-09-21",
+        "anomalous_day_z": 2.65,
+        "anomalous_day_excess_kwh": 5.15
+      },
+      "evidence": [
+        "E1",
+        "E11",
+        "E12"
+      ],
+      "notes": [
+        "rule: top day >= 25% of the total change (largest day in the direction of the change)",
+        "top day 2026-10-17 (partner baseline day 2026-09-19): average price on baseline day 2026-09-19 (window A) is 2.6 sd below its window mean; also: heating degree days on 2026-10-17 (window B) 1.9 sd, usage on 2026-10-17 (window B) 1.8 sd",
+        "most unusual day by weather- and weekday-adjusted daily kWh: 2026-09-21, +5.1 kWh vs the model (2.6 sd)",
+        "largest day against the direction of the change: 2026-10-09 (-£20.02, 19% of the total); average price on 2026-10-09 (window B) is 2.8 sd below its window mean"
+      ],
+      "details": {
+        "top": {
+          "share": 0.3095716698105027,
+          "date": "2026-10-17",
+          "deltaPence": 3240.3287000000005,
+          "totalPence": 10467.135775
+        },
+        "opposite": {
+          "date": "2026-10-09",
+          "deltaPence": -2002.1822255000002,
+          "share": -0.19128272227843535
+        },
+        "topDriver": {
+          "kind": "price_A",
+          "label": "average price on baseline day 2026-09-19 (window A)",
+          "z": -2.607998169678819
+        },
+        "oppositeDriver": {
+          "kind": "price_B",
+          "label": "average price on 2026-10-09 (window B)",
+          "z": -2.770731109231629
+        },
+        "anomaly": {
+          "date": "2026-09-21",
+          "excessKwh": 5.145874514352393,
+          "z": 2.648893964579955
+        }
+      }
+    },
+    {
+      "id": "H7",
+      "name": "meter_fault",
+      "status": "ruled_out",
+      "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)",
+      "summary": {
+        "zero_runs": 0,
+        "flatlines": 0,
+        "duplicate_timestamps": 0,
+        "days_not_48_slots": 0,
+        "sites_checked": 1
+      },
+      "evidence": [
+        "E13"
+      ],
+      "notes": [
+        "rule: zero run >= 4 slots, flatline >= 12 identical non-zero readings, duplicate ts, days != 48 slots; ruled out if none"
+      ],
+      "details": {
+        "issues": []
+      }
+    },
+    {
+      "id": "H8",
+      "name": "tariff_change",
+      "status": "ruled_out",
+      "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00",
+      "summary": {
+        "product_A": "AGILE-24-10-01",
+        "product_B": "AGILE-24-10-01",
+        "standing_A_p_per_day": 37.6525,
+        "standing_B_p_per_day": 37.6525,
+        "standing_effect_gbp": 0,
+        "changes_inside_a_window": 0
+      },
+      "evidence": [
+        "E14",
+        "E2"
+      ],
+      "notes": [
+        "rule: ruled out if product code, tariff code and standing charge are equal in both windows and no contract row starts inside a window"
+      ],
+      "details": {
+        "diff": {
+          "productChanged": false,
+          "tariffChanged": false,
+          "standingChanged": false,
+          "midWindow": 0
+        }
+      }
+    },
+    {
+      "id": "H9",
+      "name": "data_gap",
+      "status": "ruled_out",
+      "headline": "complete: 2 site-window(s) all have 1344 priced half-hours",
+      "summary": {
+        "site_windows_checked": 2,
+        "site_windows_with_gap": 0,
+        "carbon_gaps": 0,
+        "expected_rows_per_window": 1344
+      },
+      "evidence": [
+        "E15"
+      ],
+      "notes": [
+        "rule: every site-window must have exactly 1344 meter rows joined to a price; ruled out if complete"
+      ],
+      "details": {
+        "gaps": []
+      }
+    },
+    {
+      "id": "H10",
+      "name": "carbon",
+      "status": "supported",
+      "headline": "emissions 320.5 -> 401.2 kgCO2e (+80.7): volume 22.1 (27%), intensity level 65.9 (82%), timing -7.3 (9%) kg",
+      "summary": {
+        "emissions_A_kg": 320.498,
+        "emissions_B_kg": 401.209,
+        "delta_kg": 80.711,
+        "volume_kg": 22.104,
+        "intensity_level_kg": 65.871,
+        "timing_kg": -7.263,
+        "volume_status": "supported",
+        "intensity_level_status": "supported",
+        "timing_status": "ruled_out",
+        "avg_intensity_A": 123.56,
+        "avg_intensity_B": 144.7
+      },
+      "evidence": [
+        "E16"
+      ],
+      "notes": [
+        "rule per component like H1: same direction as the change and >= 20% of |change|; ruled out if emissions did not rise",
+        "location-based Scope 2 estimate from regional carbon intensity; meter kWh are SAMPLE data"
+      ],
+      "details": {
+        "components": {
+          "volume": {
+            "kg": 22.103616175541177,
+            "share": 0.27386016766694987,
+            "status": "supported"
+          },
+          "intensity_level": {
+            "kg": 65.87120372205897,
+            "share": 0.8161333762078508,
+            "status": "supported"
+          },
+          "timing": {
+            "kg": -7.263497897600178,
+            "share": 0.08999354387480087,
+            "status": "ruled_out"
+          }
+        }
+      }
+    },
+    {
       "id": "H11",
       "name": "usage_anomaly_day",
       "status": "ruled_out",
@@ -402,8 +502,8 @@
         "top_ops_event": null
       },
       "evidence": [
-        "E13",
-        "E14"
+        "E17",
+        "E18"
       ],
       "notes": [
         "rule: any site-day with |z| >= 4 (z = standardised residual of the adjusted daily-kWh model, per site)",
@@ -465,78 +565,6 @@
         ],
         "failedSites": []
       }
-    },
-    {
-      "id": "H7",
-      "name": "meter_fault",
-      "status": "ruled_out",
-      "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)",
-      "summary": {
-        "zero_runs": 0,
-        "flatlines": 0,
-        "duplicate_timestamps": 0,
-        "days_not_48_slots": 0,
-        "sites_checked": 1
-      },
-      "evidence": [
-        "E15"
-      ],
-      "notes": [
-        "rule: zero run >= 4 slots, flatline >= 12 identical non-zero readings, duplicate ts, days != 48 slots; ruled out if none"
-      ],
-      "details": {
-        "issues": []
-      }
-    },
-    {
-      "id": "H8",
-      "name": "tariff_change",
-      "status": "ruled_out",
-      "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00",
-      "summary": {
-        "product_A": "AGILE-24-10-01",
-        "product_B": "AGILE-24-10-01",
-        "standing_A_p_per_day": 37.6525,
-        "standing_B_p_per_day": 37.6525,
-        "standing_effect_gbp": 0,
-        "changes_inside_a_window": 0
-      },
-      "evidence": [
-        "E16",
-        "E2"
-      ],
-      "notes": [
-        "rule: ruled out if product code, tariff code and standing charge are equal in both windows and no contract row starts inside a window"
-      ],
-      "details": {
-        "diff": {
-          "productChanged": false,
-          "tariffChanged": false,
-          "standingChanged": false,
-          "midWindow": 0
-        }
-      }
-    },
-    {
-      "id": "H9",
-      "name": "data_gap",
-      "status": "ruled_out",
-      "headline": "complete: 2 site-window(s) all have 1344 priced half-hours",
-      "summary": {
-        "site_windows_checked": 2,
-        "site_windows_with_gap": 0,
-        "carbon_gaps": 0,
-        "expected_rows_per_window": 1344
-      },
-      "evidence": [
-        "E17"
-      ],
-      "notes": [
-        "rule: every site-window must have exactly 1344 meter rows joined to a price; ruled out if complete"
-      ],
-      "details": {
-        "gaps": []
-      }
     }
   ],
   "evidence": [
@@ -545,7 +573,7 @@
       "hypothesisId": "DECOMP",
       "title": "Half-hourly meter x Agile price x carbon, S2, windows A and B",
       "sql": "SELECT m.site_id, m.ts, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, m.kwh, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nORDER BY m.site_id, m.ts",
-      "zetarisRunId": "3c718a47-81ea-4a37-9b3b-3b4c46aeb6aa",
+      "zetarisRunId": "7b693a0b-de0b-4d66-98d8-99ec823a3a7f",
       "rowCount": 2688,
       "resultSha256": "ee6b2d0a2928bd3a1b1f38c290049d6e799155842301a7f4a72e1e69f276e70a",
       "sampleRows": [
@@ -738,7 +766,7 @@
       "hypothesisId": "DECOMP",
       "title": "Contract and standing charge",
       "sql": "SELECT 'contract' AS src, product_code, tariff_code, CAST(standing_charge_p_per_day AS DOUBLE) AS standing_p_per_day, CAST(vat_rate AS DOUBLE) AS vat_rate, CAST(valid_from AS STRING) AS valid_from FROM kilowhy.contract\nUNION ALL\nSELECT 'agile_standing', CAST(NULL AS STRING), CAST(NULL AS STRING), CAST(p_day_inc_vat AS DOUBLE), CAST(NULL AS DOUBLE), CAST(valid_from AS STRING) FROM kilowhy.agile_standing\nORDER BY src, valid_from",
-      "zetarisRunId": "90180ad1-6fb9-4e28-b057-3c584067e5d3",
+      "zetarisRunId": "9ad29b6a-e0f1-470f-83c2-5ccec8026f16",
       "rowCount": 2,
       "resultSha256": "6650cc411f47b33f1e774dc1bc357b4b5099b811280ae50b2489f15974ef202f",
       "sampleRows": [
@@ -785,7 +813,7 @@
       "hypothesisId": "H1",
       "title": "Price level A vs B (S2)",
       "sql": "SELECT m.site_id, m.ts, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, m.kwh, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nORDER BY m.site_id, m.ts",
-      "zetarisRunId": "3c718a47-81ea-4a37-9b3b-3b4c46aeb6aa",
+      "zetarisRunId": "7b693a0b-de0b-4d66-98d8-99ec823a3a7f",
       "rowCount": 2688,
       "resultSha256": "ee6b2d0a2928bd3a1b1f38c290049d6e799155842301a7f4a72e1e69f276e70a",
       "sampleRows": [
@@ -1006,7 +1034,7 @@
       "hypothesisId": "H2",
       "title": "Generation mix and price, A vs B (S2)",
       "sql": "SELECT m.site_id, m.ts, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, m.kwh, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nORDER BY m.site_id, m.ts",
-      "zetarisRunId": "3c718a47-81ea-4a37-9b3b-3b4c46aeb6aa",
+      "zetarisRunId": "7b693a0b-de0b-4d66-98d8-99ec823a3a7f",
       "rowCount": 2688,
       "resultSha256": "ee6b2d0a2928bd3a1b1f38c290049d6e799155842301a7f4a72e1e69f276e70a",
       "sampleRows": [
@@ -1195,7 +1223,7 @@
       "hypothesisId": "H3",
       "title": "Daily kWh and mean temperature (S2)",
       "sql": "WITH k AS (SELECT site_id, CAST(ts AS DATE) AS d, SUM(kwh) AS kwh, COUNT(*) AS n_slots FROM kilowhy.meter_hh WHERE site_id IN ('S2') AND ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00' GROUP BY site_id, CAST(ts AS DATE)),\nt AS (SELECT CAST(ts AS DATE) AS d, AVG(temp_c) AS t_mean, COUNT(*) AS n_hours FROM kilowhy.temp_hourly WHERE ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00' GROUP BY CAST(ts AS DATE))\nSELECT k.site_id, k.d, k.kwh, k.n_slots, t.t_mean, t.n_hours FROM k LEFT JOIN t ON k.d = t.d ORDER BY k.site_id, k.d",
-      "zetarisRunId": "1eea3963-5b74-4b81-a439-e89d52a4a07c",
+      "zetarisRunId": "0f128114-11a7-4790-83c0-443f04637b76",
       "rowCount": 56,
       "resultSha256": "35b716acb446211d52340cb400472ed4e4c60c519bd0eedd456b3630e754fd92",
       "sampleRows": [
@@ -1342,7 +1370,7 @@
       "hypothesisId": "H4",
       "title": "Daily kWh and mean temperature (S2)",
       "sql": "WITH k AS (SELECT site_id, CAST(ts AS DATE) AS d, SUM(kwh) AS kwh, COUNT(*) AS n_slots FROM kilowhy.meter_hh WHERE site_id IN ('S2') AND ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00' GROUP BY site_id, CAST(ts AS DATE)),\nt AS (SELECT CAST(ts AS DATE) AS d, AVG(temp_c) AS t_mean, COUNT(*) AS n_hours FROM kilowhy.temp_hourly WHERE ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00' GROUP BY CAST(ts AS DATE))\nSELECT k.site_id, k.d, k.kwh, k.n_slots, t.t_mean, t.n_hours FROM k LEFT JOIN t ON k.d = t.d ORDER BY k.site_id, k.d",
-      "zetarisRunId": "1eea3963-5b74-4b81-a439-e89d52a4a07c",
+      "zetarisRunId": "0f128114-11a7-4790-83c0-443f04637b76",
       "rowCount": 56,
       "resultSha256": "35b716acb446211d52340cb400472ed4e4c60c519bd0eedd456b3630e754fd92",
       "sampleRows": [
@@ -1473,7 +1501,7 @@
       "hypothesisId": "H4",
       "title": "ops_log events (S2)",
       "sql": "SELECT event_id, site_id, CAST(event_date AS STRING) AS event_date, description FROM kilowhy.ops_log WHERE site_id IN ('S2') ORDER BY event_date, event_id",
-      "zetarisRunId": "419fefbb-e0dd-4207-8e09-abeff05e2404",
+      "zetarisRunId": "77db3cc9-6407-4fc3-9a45-f4a6c8ebfbdd",
       "rowCount": 1,
       "resultSha256": "ddc367fc5b9d00126b2b045cbefb06a4458b2c4007b83da5e54f727cb114d3ce",
       "sampleRows": [
@@ -1506,7 +1534,7 @@
       "hypothesisId": "H4",
       "title": "Half-hourly kWh around events (S2)",
       "sql": "SELECT m.site_id, m.ts, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, m.kwh, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nORDER BY m.site_id, m.ts",
-      "zetarisRunId": "3c718a47-81ea-4a37-9b3b-3b4c46aeb6aa",
+      "zetarisRunId": "7b693a0b-de0b-4d66-98d8-99ec823a3a7f",
       "rowCount": 2688,
       "resultSha256": "ee6b2d0a2928bd3a1b1f38c290049d6e799155842301a7f4a72e1e69f276e70a",
       "sampleRows": [
@@ -1648,10 +1676,264 @@
     },
     {
       "id": "E9",
+      "hypothesisId": "H5",
+      "title": "kWh share per time band and timing effect (S2)",
+      "sql": "SELECT m.site_id, m.ts, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, m.kwh, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nORDER BY m.site_id, m.ts",
+      "zetarisRunId": "7b693a0b-de0b-4d66-98d8-99ec823a3a7f",
+      "rowCount": 2688,
+      "resultSha256": "ee6b2d0a2928bd3a1b1f38c290049d6e799155842301a7f4a72e1e69f276e70a",
+      "sampleRows": [
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 00:00:00.0",
+          "win": "A",
+          "kwh": "1.032",
+          "p": "22.764",
+          "intensity": "106",
+          "wind_pct": "38.3",
+          "gas_pct": "9.4",
+          "imports_pct": "26.1"
+        },
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 00:30:00.0",
+          "win": "A",
+          "kwh": "0.935",
+          "p": "22.764",
+          "intensity": "117",
+          "wind_pct": "39.8",
+          "gas_pct": "10.0",
+          "imports_pct": "21.6"
+        },
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 01:00:00.0",
+          "win": "A",
+          "kwh": "0.922",
+          "p": "22.4385",
+          "intensity": "125",
+          "wind_pct": "38.9",
+          "gas_pct": "11.8",
+          "imports_pct": "20.9"
+        },
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 01:30:00.0",
+          "win": "A",
+          "kwh": "0.983",
+          "p": "21.0735",
+          "intensity": "123",
+          "wind_pct": "42.3",
+          "gas_pct": "12.4",
+          "imports_pct": "13.7"
+        },
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 02:00:00.0",
+          "win": "A",
+          "kwh": "0.953",
+          "p": "21.525",
+          "intensity": "124",
+          "wind_pct": "42.7",
+          "gas_pct": "13.0",
+          "imports_pct": "12.9"
+        },
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 02:30:00.0",
+          "win": "A",
+          "kwh": "1.029",
+          "p": "21.336",
+          "intensity": "112",
+          "wind_pct": "43.2",
+          "gas_pct": "14.8",
+          "imports_pct": "8.9"
+        },
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 03:00:00.0",
+          "win": "A",
+          "kwh": "4.933",
+          "p": "21.525",
+          "intensity": "114",
+          "wind_pct": "42.5",
+          "gas_pct": "15.9",
+          "imports_pct": "8.1"
+        },
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 03:30:00.0",
+          "win": "A",
+          "kwh": "4.938",
+          "p": "22.407",
+          "intensity": "114",
+          "wind_pct": "39.4",
+          "gas_pct": "23.1",
+          "imports_pct": "1.6"
+        },
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 04:00:00.0",
+          "win": "A",
+          "kwh": "4.758",
+          "p": "25.893",
+          "intensity": "129",
+          "wind_pct": "37.0",
+          "gas_pct": "27.1",
+          "imports_pct": "1.6"
+        },
+        {
+          "site_id": "S2",
+          "ts": "2026-08-27 04:30:00.0",
+          "win": "A",
+          "kwh": "4.822",
+          "p": "26.9325",
+          "intensity": "152",
+          "wind_pct": "35.2",
+          "gas_pct": "26.9",
+          "imports_pct": "7.1"
+        }
+      ],
+      "metrics": {
+        "timing_T": {
+          "value": 1.03,
+          "unit": "GBP"
+        },
+        "timing_share_of_delta": {
+          "value": 0.009830840359168347,
+          "unit": "ratio"
+        },
+        "kwh_share_night_A": {
+          "value": 0.3934875644734046,
+          "unit": "ratio"
+        },
+        "kwh_share_night_B": {
+          "value": 0.31083626569763106,
+          "unit": "ratio"
+        },
+        "kwh_share_morning_A": {
+          "value": 0.3515198548594223,
+          "unit": "ratio"
+        },
+        "kwh_share_morning_B": {
+          "value": 0.426124074984375,
+          "unit": "ratio"
+        },
+        "kwh_share_afternoon_A": {
+          "value": 0.08505072865211791,
+          "unit": "ratio"
+        },
+        "kwh_share_afternoon_B": {
+          "value": 0.08436625768043819,
+          "unit": "ratio"
+        },
+        "kwh_share_peak_A": {
+          "value": 0.06349938837248485,
+          "unit": "ratio"
+        },
+        "kwh_share_peak_B": {
+          "value": 0.06433986550014047,
+          "unit": "ratio"
+        },
+        "kwh_share_evening_A": {
+          "value": 0.10644246364257044,
+          "unit": "ratio"
+        },
+        "kwh_share_evening_B": {
+          "value": 0.11433353613741526,
+          "unit": "ratio"
+        },
+        "peak_share_change_pp": {
+          "value": 0.08404771276556144,
+          "unit": "pp"
+        },
+        "schedule_shift_detected": {
+          "value": false,
+          "unit": "flag"
+        },
+        "schedule_shift_sites": {
+          "value": null,
+          "unit": "sites"
+        },
+        "schedule_candidate_site": {
+          "value": "S2",
+          "unit": "site"
+        },
+        "schedule_candidate_band": {
+          "value": "night",
+          "unit": "band"
+        },
+        "schedule_candidate_delta_pp": {
+          "value": -8.26512987757737,
+          "unit": "pp"
+        },
+        "schedule_candidate_change_point": {
+          "value": "2026-10-07",
+          "unit": "date"
+        },
+        "schedule_candidate_event": {
+          "value": "E1 (2026-10-07, +0 d): SAMPLE: Oven schedule moved 2h later from this date (new sourdough line).",
+          "unit": "text"
+        },
+        "schedule_shift_threshold_pp": {
+          "value": 10,
+          "unit": "pp"
+        }
+      },
+      "sources": [
+        {
+          "view": "meter_hh",
+          "kind": "FILE: sample"
+        },
+        {
+          "view": "agile_rates",
+          "kind": "REST: Octopus"
+        },
+        {
+          "view": "ci_london",
+          "kind": "REST: NESO"
+        }
+      ]
+    },
+    {
+      "id": "E10",
+      "hypothesisId": "H5",
+      "title": "ops_log events (S2)",
+      "sql": "SELECT event_id, site_id, CAST(event_date AS STRING) AS event_date, description FROM kilowhy.ops_log WHERE site_id IN ('S2') ORDER BY event_date, event_id",
+      "zetarisRunId": "77db3cc9-6407-4fc3-9a45-f4a6c8ebfbdd",
+      "rowCount": 1,
+      "resultSha256": "ddc367fc5b9d00126b2b045cbefb06a4458b2c4007b83da5e54f727cb114d3ce",
+      "sampleRows": [
+        {
+          "event_id": "E1",
+          "site_id": "S2",
+          "event_date": "2026-10-07",
+          "description": "SAMPLE: Oven schedule moved 2h later from this date (new sourdough line)."
+        }
+      ],
+      "metrics": {
+        "events_in_scope": {
+          "value": 1,
+          "unit": "events"
+        },
+        "schedule_shifts_with_event": {
+          "value": 0,
+          "unit": "shifts"
+        }
+      },
+      "sources": [
+        {
+          "view": "ops_log",
+          "kind": "FILE: sample"
+        }
+      ]
+    },
+    {
+      "id": "E11",
       "hypothesisId": "H6",
       "title": "Day-by-day change in cost (S2)",
       "sql": "SELECT m.site_id, m.ts, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, m.kwh, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nORDER BY m.site_id, m.ts",
-      "zetarisRunId": "3c718a47-81ea-4a37-9b3b-3b4c46aeb6aa",
+      "zetarisRunId": "7b693a0b-de0b-4d66-98d8-99ec823a3a7f",
       "rowCount": 2688,
       "resultSha256": "ee6b2d0a2928bd3a1b1f38c290049d6e799155842301a7f4a72e1e69f276e70a",
       "sampleRows": [
@@ -1872,11 +2154,11 @@
       ]
     },
     {
-      "id": "E10",
+      "id": "E12",
       "hypothesisId": "H6",
       "title": "Daily mean temperature (S2)",
       "sql": "WITH k AS (SELECT site_id, CAST(ts AS DATE) AS d, SUM(kwh) AS kwh, COUNT(*) AS n_slots FROM kilowhy.meter_hh WHERE site_id IN ('S2') AND ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00' GROUP BY site_id, CAST(ts AS DATE)),\nt AS (SELECT CAST(ts AS DATE) AS d, AVG(temp_c) AS t_mean, COUNT(*) AS n_hours FROM kilowhy.temp_hourly WHERE ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00' GROUP BY CAST(ts AS DATE))\nSELECT k.site_id, k.d, k.kwh, k.n_slots, t.t_mean, t.n_hours FROM k LEFT JOIN t ON k.d = t.d ORDER BY k.site_id, k.d",
-      "zetarisRunId": "1eea3963-5b74-4b81-a439-e89d52a4a07c",
+      "zetarisRunId": "0f128114-11a7-4790-83c0-443f04637b76",
       "rowCount": 56,
       "resultSha256": "35b716acb446211d52340cb400472ed4e4c60c519bd0eedd456b3630e754fd92",
       "sampleRows": [
@@ -1979,11 +2261,190 @@
       ]
     },
     {
-      "id": "E11",
-      "hypothesisId": "H5",
-      "title": "kWh share per time band and timing effect (S2)",
+      "id": "E13",
+      "hypothesisId": "H7",
+      "title": "Meter quality checks (S2)",
+      "sql": "WITH base AS (SELECT site_id, ts, kwh FROM kilowhy.meter_hh WHERE site_id IN ('S2') AND ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00'),\nlagged AS (SELECT site_id, ts, kwh, LAG(kwh) OVER (PARTITION BY site_id ORDER BY ts) AS prev_kwh FROM base),\ngrp AS (SELECT site_id, ts, kwh, SUM(CASE WHEN prev_kwh IS NULL OR kwh <> prev_kwh THEN 1 ELSE 0 END) OVER (PARTITION BY site_id ORDER BY ts) AS g FROM lagged),\nruns AS (SELECT site_id, kwh, g, MIN(ts) AS start_ts, MAX(ts) AS end_ts, COUNT(*) AS n FROM grp GROUP BY site_id, kwh, g)\nSELECT CASE WHEN kwh = 0 THEN 'zero_run' ELSE 'flatline' END AS check_name, site_id, CAST(start_ts AS STRING) AS start_ts, CAST(end_ts AS STRING) AS end_ts, n, kwh AS value FROM runs WHERE (kwh = 0 AND n >= 4) OR (kwh <> 0 AND n >= 12)\nUNION ALL\nSELECT 'duplicate_ts', site_id, CAST(ts AS STRING), CAST(ts AS STRING), COUNT(*), CAST(NULL AS DOUBLE) FROM base GROUP BY site_id, ts HAVING COUNT(*) > 1\nUNION ALL\nSELECT 'slots_per_day', site_id, CAST(CAST(ts AS DATE) AS STRING), CAST(CAST(ts AS DATE) AS STRING), COUNT(*), CAST(NULL AS DOUBLE) FROM base GROUP BY site_id, CAST(ts AS DATE) HAVING COUNT(*) <> 48\nUNION ALL\nSELECT 'rows', site_id, CAST(MIN(ts) AS STRING), CAST(MAX(ts) AS STRING), COUNT(*), SUM(kwh) FROM base GROUP BY site_id\nORDER BY check_name, site_id, start_ts",
+      "zetarisRunId": "9364e4ec-7ed0-4ea4-a928-a50da71be80e",
+      "rowCount": 1,
+      "resultSha256": "c4e255627c0b7c7b82a8cd2ea853f1cc05fd9eb32ee86e2ee8880b1a0effd3cf",
+      "sampleRows": [
+        {
+          "check_name": "rows",
+          "site_id": "S2",
+          "start_ts": "2026-08-27 00:00:00",
+          "end_ts": "2026-10-21 23:30:00",
+          "n": "2688",
+          "value": "5366.689999999988"
+        }
+      ],
+      "metrics": {
+        "zero_runs": {
+          "value": 0,
+          "unit": "runs"
+        },
+        "flatlines": {
+          "value": 0,
+          "unit": "runs"
+        },
+        "duplicate_timestamps": {
+          "value": 0,
+          "unit": "timestamps"
+        },
+        "days_not_48_slots": {
+          "value": 0,
+          "unit": "days"
+        },
+        "sites_checked": {
+          "value": 1,
+          "unit": "sites"
+        },
+        "zero_run_min_slots": {
+          "value": 4,
+          "unit": "slots"
+        },
+        "flatline_min_slots": {
+          "value": 12,
+          "unit": "slots"
+        }
+      },
+      "sources": [
+        {
+          "view": "meter_hh",
+          "kind": "FILE: sample"
+        }
+      ]
+    },
+    {
+      "id": "E14",
+      "hypothesisId": "H8",
+      "title": "Contract and standing charge by window",
+      "sql": "SELECT 'contract' AS src, product_code, tariff_code, CAST(standing_charge_p_per_day AS DOUBLE) AS standing_p_per_day, CAST(vat_rate AS DOUBLE) AS vat_rate, CAST(valid_from AS STRING) AS valid_from FROM kilowhy.contract\nUNION ALL\nSELECT 'agile_standing', CAST(NULL AS STRING), CAST(NULL AS STRING), CAST(p_day_inc_vat AS DOUBLE), CAST(NULL AS DOUBLE), CAST(valid_from AS STRING) FROM kilowhy.agile_standing\nORDER BY src, valid_from",
+      "zetarisRunId": "9ad29b6a-e0f1-470f-83c2-5ccec8026f16",
+      "rowCount": 2,
+      "resultSha256": "6650cc411f47b33f1e774dc1bc357b4b5099b811280ae50b2489f15974ef202f",
+      "sampleRows": [
+        {
+          "src": "agile_standing",
+          "product_code": null,
+          "tariff_code": null,
+          "standing_p_per_day": "37.6525",
+          "vat_rate": null,
+          "valid_from": "2024-09-30 23:00:00"
+        },
+        {
+          "src": "contract",
+          "product_code": "AGILE-24-10-01",
+          "tariff_code": "E-1R-AGILE-24-10-01-C",
+          "standing_p_per_day": "37.6525",
+          "vat_rate": "0.05",
+          "valid_from": "2026-08-27"
+        }
+      ],
+      "metrics": {
+        "standing_A": {
+          "value": 37.6525,
+          "unit": "p/day"
+        },
+        "standing_B": {
+          "value": 37.6525,
+          "unit": "p/day"
+        },
+        "product_A": {
+          "value": "AGILE-24-10-01",
+          "unit": "code"
+        },
+        "product_B": {
+          "value": "AGILE-24-10-01",
+          "unit": "code"
+        },
+        "standing_effect_S": {
+          "value": 0,
+          "unit": "GBP"
+        },
+        "published_standing_changes_in_span": {
+          "value": 0,
+          "unit": "rows"
+        }
+      },
+      "sources": [
+        {
+          "view": "contract",
+          "kind": "FILE: sample"
+        },
+        {
+          "view": "agile_standing",
+          "kind": "REST: Octopus"
+        }
+      ]
+    },
+    {
+      "id": "E15",
+      "hypothesisId": "H9",
+      "title": "Joined meter x price rows per site and window (S2)",
+      "sql": "SELECT m.site_id, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, COUNT(*) AS n_meter, COUNT(r.slot_start) AS n_priced, COUNT(c.slot_start) AS n_carbon\nFROM kilowhy.meter_hh m LEFT JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nGROUP BY m.site_id, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END ORDER BY m.site_id, win",
+      "zetarisRunId": "58d49fd1-a5c7-4ca7-a817-71eb1768108d",
+      "rowCount": 2,
+      "resultSha256": "0eeca946a701b390185b3548d38985578de879178600fd597d56a910ac84a312",
+      "sampleRows": [
+        {
+          "site_id": "S2",
+          "win": "A",
+          "n_meter": "1344",
+          "n_priced": "1344",
+          "n_carbon": "1344"
+        },
+        {
+          "site_id": "S2",
+          "win": "B",
+          "n_meter": "1344",
+          "n_priced": "1344",
+          "n_carbon": "1344"
+        }
+      ],
+      "metrics": {
+        "expected_rows_per_window": {
+          "value": 1344,
+          "unit": "slots"
+        },
+        "site_windows_checked": {
+          "value": 2,
+          "unit": "site-windows"
+        },
+        "site_windows_with_gap": {
+          "value": 0,
+          "unit": "site-windows"
+        },
+        "missing_price_or_meter_slots": {
+          "value": 0,
+          "unit": "slots"
+        },
+        "site_windows_with_carbon_gap": {
+          "value": 0,
+          "unit": "site-windows"
+        }
+      },
+      "sources": [
+        {
+          "view": "meter_hh",
+          "kind": "FILE: sample"
+        },
+        {
+          "view": "agile_rates",
+          "kind": "REST: Octopus"
+        },
+        {
+          "view": "ci_london",
+          "kind": "REST: NESO"
+        }
+      ]
+    },
+    {
+      "id": "E16",
+      "hypothesisId": "H10",
+      "title": "Carbon emissions decomposition (S2)",
       "sql": "SELECT m.site_id, m.ts, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, m.kwh, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nORDER BY m.site_id, m.ts",
-      "zetarisRunId": "3c718a47-81ea-4a37-9b3b-3b4c46aeb6aa",
+      "zetarisRunId": "7b693a0b-de0b-4d66-98d8-99ec823a3a7f",
       "rowCount": 2688,
       "resultSha256": "ee6b2d0a2928bd3a1b1f38c290049d6e799155842301a7f4a72e1e69f276e70a",
       "sampleRows": [
@@ -2099,89 +2560,45 @@
         }
       ],
       "metrics": {
-        "timing_T": {
-          "value": 1.03,
-          "unit": "GBP"
+        "emissions_A": {
+          "value": 320.49811,
+          "unit": "kgCO2e"
         },
-        "timing_share_of_delta": {
-          "value": 0.009830840359168347,
-          "unit": "ratio"
+        "emissions_B": {
+          "value": 401.209432,
+          "unit": "kgCO2e"
         },
-        "kwh_share_night_A": {
-          "value": 0.3934875644734046,
-          "unit": "ratio"
+        "delta_emissions": {
+          "value": 80.71132199999998,
+          "unit": "kgCO2e"
         },
-        "kwh_share_night_B": {
-          "value": 0.31083626569763106,
-          "unit": "ratio"
+        "avg_intensity_A": {
+          "value": 123.55843847428137,
+          "unit": "gCO2/kWh"
         },
-        "kwh_share_morning_A": {
-          "value": 0.3515198548594223,
-          "unit": "ratio"
+        "avg_intensity_B": {
+          "value": 144.6951580555476,
+          "unit": "gCO2/kWh"
         },
-        "kwh_share_morning_B": {
-          "value": 0.426124074984375,
-          "unit": "ratio"
+        "avg_intensity_B_on_A_shape": {
+          "value": 147.3147200411427,
+          "unit": "gCO2/kWh"
         },
-        "kwh_share_afternoon_A": {
-          "value": 0.08505072865211791,
-          "unit": "ratio"
+        "volume_Vc": {
+          "value": 22.103616175541177,
+          "unit": "kgCO2e"
         },
-        "kwh_share_afternoon_B": {
-          "value": 0.08436625768043819,
-          "unit": "ratio"
+        "intensity_level_Lc": {
+          "value": 65.87120372205897,
+          "unit": "kgCO2e"
         },
-        "kwh_share_peak_A": {
-          "value": 0.06349938837248485,
-          "unit": "ratio"
+        "timing_Tc": {
+          "value": -7.263497897600178,
+          "unit": "kgCO2e"
         },
-        "kwh_share_peak_B": {
-          "value": 0.06433986550014047,
-          "unit": "ratio"
-        },
-        "kwh_share_evening_A": {
-          "value": 0.10644246364257044,
-          "unit": "ratio"
-        },
-        "kwh_share_evening_B": {
-          "value": 0.11433353613741526,
-          "unit": "ratio"
-        },
-        "peak_share_change_pp": {
-          "value": 0.08404771276556144,
-          "unit": "pp"
-        },
-        "schedule_shift_detected": {
-          "value": false,
-          "unit": "flag"
-        },
-        "schedule_shift_sites": {
-          "value": null,
-          "unit": "sites"
-        },
-        "schedule_candidate_site": {
-          "value": "S2",
-          "unit": "site"
-        },
-        "schedule_candidate_band": {
-          "value": "night",
-          "unit": "band"
-        },
-        "schedule_candidate_delta_pp": {
-          "value": -8.26512987757737,
-          "unit": "pp"
-        },
-        "schedule_candidate_change_point": {
-          "value": "2026-10-07",
-          "unit": "date"
-        },
-        "schedule_candidate_event": {
-          "value": "E1 (2026-10-07, +0 d): SAMPLE: Oven schedule moved 2h later from this date (new sourdough line).",
-          "unit": "text"
-        },
-        "schedule_shift_threshold_pp": {
-          "value": 10,
-          "unit": "pp"
+        "identity_error": {
+          "value": 1.4551915228366852e-11,
+          "unit": "g"
         }
       },
       "sources": [
@@ -2200,44 +2617,11 @@
       ]
     },
     {
-      "id": "E12",
-      "hypothesisId": "H5",
-      "title": "ops_log events (S2)",
-      "sql": "SELECT event_id, site_id, CAST(event_date AS STRING) AS event_date, description FROM kilowhy.ops_log WHERE site_id IN ('S2') ORDER BY event_date, event_id",
-      "zetarisRunId": "419fefbb-e0dd-4207-8e09-abeff05e2404",
-      "rowCount": 1,
-      "resultSha256": "ddc367fc5b9d00126b2b045cbefb06a4458b2c4007b83da5e54f727cb114d3ce",
-      "sampleRows": [
-        {
-          "event_id": "E1",
-          "site_id": "S2",
-          "event_date": "2026-10-07",
-          "description": "SAMPLE: Oven schedule moved 2h later from this date (new sourdough line)."
-        }
-      ],
-      "metrics": {
-        "events_in_scope": {
-          "value": 1,
-          "unit": "events"
-        },
-        "schedule_shifts_with_event": {
-          "value": 0,
-          "unit": "shifts"
-        }
-      },
-      "sources": [
-        {
-          "view": "ops_log",
-          "kind": "FILE: sample"
-        }
-      ]
-    },
-    {
-      "id": "E13",
+      "id": "E17",
       "hypothesisId": "H11",
       "title": "Daily kWh and mean temperature (S2)",
       "sql": "WITH k AS (SELECT site_id, CAST(ts AS DATE) AS d, SUM(kwh) AS kwh, COUNT(*) AS n_slots FROM kilowhy.meter_hh WHERE site_id IN ('S2') AND ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00' GROUP BY site_id, CAST(ts AS DATE)),\nt AS (SELECT CAST(ts AS DATE) AS d, AVG(temp_c) AS t_mean, COUNT(*) AS n_hours FROM kilowhy.temp_hourly WHERE ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00' GROUP BY CAST(ts AS DATE))\nSELECT k.site_id, k.d, k.kwh, k.n_slots, t.t_mean, t.n_hours FROM k LEFT JOIN t ON k.d = t.d ORDER BY k.site_id, k.d",
-      "zetarisRunId": "1eea3963-5b74-4b81-a439-e89d52a4a07c",
+      "zetarisRunId": "0f128114-11a7-4790-83c0-443f04637b76",
       "rowCount": 56,
       "resultSha256": "35b716acb446211d52340cb400472ed4e4c60c519bd0eedd456b3630e754fd92",
       "sampleRows": [
@@ -2380,11 +2764,11 @@
       ]
     },
     {
-      "id": "E14",
+      "id": "E18",
       "hypothesisId": "H11",
       "title": "ops_log events (S2)",
       "sql": "SELECT event_id, site_id, CAST(event_date AS STRING) AS event_date, description FROM kilowhy.ops_log WHERE site_id IN ('S2') ORDER BY event_date, event_id",
-      "zetarisRunId": "419fefbb-e0dd-4207-8e09-abeff05e2404",
+      "zetarisRunId": "77db3cc9-6407-4fc3-9a45-f4a6c8ebfbdd",
       "rowCount": 1,
       "resultSha256": "ddc367fc5b9d00126b2b045cbefb06a4458b2c4007b83da5e54f727cb114d3ce",
       "sampleRows": [
@@ -2413,217 +2797,11 @@
       ]
     },
     {
-      "id": "E15",
-      "hypothesisId": "H7",
-      "title": "Meter quality checks (S2)",
-      "sql": "WITH base AS (SELECT site_id, ts, kwh FROM kilowhy.meter_hh WHERE site_id IN ('S2') AND ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00'),\nlagged AS (SELECT site_id, ts, kwh, LAG(kwh) OVER (PARTITION BY site_id ORDER BY ts) AS prev_kwh FROM base),\ngrp AS (SELECT site_id, ts, kwh, SUM(CASE WHEN prev_kwh IS NULL OR kwh <> prev_kwh THEN 1 ELSE 0 END) OVER (PARTITION BY site_id ORDER BY ts) AS g FROM lagged),\nruns AS (SELECT site_id, kwh, g, MIN(ts) AS start_ts, MAX(ts) AS end_ts, COUNT(*) AS n FROM grp GROUP BY site_id, kwh, g)\nSELECT CASE WHEN kwh = 0 THEN 'zero_run' ELSE 'flatline' END AS check_name, site_id, CAST(start_ts AS STRING) AS start_ts, CAST(end_ts AS STRING) AS end_ts, n, kwh AS value FROM runs WHERE (kwh = 0 AND n >= 4) OR (kwh <> 0 AND n >= 12)\nUNION ALL\nSELECT 'duplicate_ts', site_id, CAST(ts AS STRING), CAST(ts AS STRING), COUNT(*), CAST(NULL AS DOUBLE) FROM base GROUP BY site_id, ts HAVING COUNT(*) > 1\nUNION ALL\nSELECT 'slots_per_day', site_id, CAST(CAST(ts AS DATE) AS STRING), CAST(CAST(ts AS DATE) AS STRING), COUNT(*), CAST(NULL AS DOUBLE) FROM base GROUP BY site_id, CAST(ts AS DATE) HAVING COUNT(*) <> 48\nUNION ALL\nSELECT 'rows', site_id, CAST(MIN(ts) AS STRING), CAST(MAX(ts) AS STRING), COUNT(*), SUM(kwh) FROM base GROUP BY site_id\nORDER BY check_name, site_id, start_ts",
-      "zetarisRunId": "9c9e5582-8857-49b8-a848-97101735d542",
-      "rowCount": 1,
-      "resultSha256": "c4e255627c0b7c7b82a8cd2ea853f1cc05fd9eb32ee86e2ee8880b1a0effd3cf",
-      "sampleRows": [
-        {
-          "check_name": "rows",
-          "site_id": "S2",
-          "start_ts": "2026-08-27 00:00:00",
-          "end_ts": "2026-10-21 23:30:00",
-          "n": "2688",
-          "value": "5366.689999999988"
-        }
-      ],
-      "metrics": {
-        "zero_runs": {
-          "value": 0,
-          "unit": "runs"
-        },
-        "flatlines": {
-          "value": 0,
-          "unit": "runs"
-        },
-        "duplicate_timestamps": {
-          "value": 0,
-          "unit": "timestamps"
-        },
-        "days_not_48_slots": {
-          "value": 0,
-          "unit": "days"
-        },
-        "sites_checked": {
-          "value": 1,
-          "unit": "sites"
-        },
-        "zero_run_min_slots": {
-          "value": 4,
-          "unit": "slots"
-        },
-        "flatline_min_slots": {
-          "value": 12,
-          "unit": "slots"
-        }
-      },
-      "sources": [
-        {
-          "view": "meter_hh",
-          "kind": "FILE: sample"
-        }
-      ]
-    },
-    {
-      "id": "E16",
-      "hypothesisId": "H8",
-      "title": "Contract and standing charge by window",
-      "sql": "SELECT 'contract' AS src, product_code, tariff_code, CAST(standing_charge_p_per_day AS DOUBLE) AS standing_p_per_day, CAST(vat_rate AS DOUBLE) AS vat_rate, CAST(valid_from AS STRING) AS valid_from FROM kilowhy.contract\nUNION ALL\nSELECT 'agile_standing', CAST(NULL AS STRING), CAST(NULL AS STRING), CAST(p_day_inc_vat AS DOUBLE), CAST(NULL AS DOUBLE), CAST(valid_from AS STRING) FROM kilowhy.agile_standing\nORDER BY src, valid_from",
-      "zetarisRunId": "90180ad1-6fb9-4e28-b057-3c584067e5d3",
-      "rowCount": 2,
-      "resultSha256": "6650cc411f47b33f1e774dc1bc357b4b5099b811280ae50b2489f15974ef202f",
-      "sampleRows": [
-        {
-          "src": "agile_standing",
-          "product_code": null,
-          "tariff_code": null,
-          "standing_p_per_day": "37.6525",
-          "vat_rate": null,
-          "valid_from": "2024-09-30 23:00:00"
-        },
-        {
-          "src": "contract",
-          "product_code": "AGILE-24-10-01",
-          "tariff_code": "E-1R-AGILE-24-10-01-C",
-          "standing_p_per_day": "37.6525",
-          "vat_rate": "0.05",
-          "valid_from": "2026-08-27"
-        }
-      ],
-      "metrics": {
-        "standing_A": {
-          "value": 37.6525,
-          "unit": "p/day"
-        },
-        "standing_B": {
-          "value": 37.6525,
-          "unit": "p/day"
-        },
-        "product_A": {
-          "value": "AGILE-24-10-01",
-          "unit": "code"
-        },
-        "product_B": {
-          "value": "AGILE-24-10-01",
-          "unit": "code"
-        },
-        "standing_effect_S": {
-          "value": 0,
-          "unit": "GBP"
-        },
-        "published_standing_changes_in_span": {
-          "value": 0,
-          "unit": "rows"
-        }
-      },
-      "sources": [
-        {
-          "view": "contract",
-          "kind": "FILE: sample"
-        },
-        {
-          "view": "agile_standing",
-          "kind": "REST: Octopus"
-        }
-      ]
-    },
-    {
-      "id": "E17",
-      "hypothesisId": "H9",
-      "title": "Joined meter x price rows per site and window (S2)",
-      "sql": "SELECT m.site_id, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, COUNT(*) AS n_meter, COUNT(r.slot_start) AS n_priced, COUNT(c.slot_start) AS n_carbon\nFROM kilowhy.meter_hh m LEFT JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nGROUP BY m.site_id, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END ORDER BY m.site_id, win",
-      "zetarisRunId": "08da793f-bca0-445c-9a2e-3e0670979bca",
-      "rowCount": 2,
-      "resultSha256": "0eeca946a701b390185b3548d38985578de879178600fd597d56a910ac84a312",
-      "sampleRows": [
-        {
-          "site_id": "S2",
-          "win": "A",
-          "n_meter": "1344",
-          "n_priced": "1344",
-          "n_carbon": "1344"
-        },
-        {
-          "site_id": "S2",
-          "win": "B",
-          "n_meter": "1344",
-          "n_priced": "1344",
-          "n_carbon": "1344"
-        }
-      ],
-      "metrics": {
-        "expected_rows_per_window": {
-          "value": 1344,
-          "unit": "slots"
-        },
-        "site_windows_checked": {
-          "value": 2,
-          "unit": "site-windows"
-        },
-        "site_windows_with_gap": {
-          "value": 0,
-          "unit": "site-windows"
-        },
-        "missing_price_or_meter_slots": {
-          "value": 0,
-          "unit": "slots"
-        },
-        "site_windows_with_carbon_gap": {
-          "value": 0,
-          "unit": "site-windows"
-        }
-      },
-      "sources": [
-        {
-          "view": "meter_hh",
-          "kind": "FILE: sample"
-        },
-        {
-          "view": "agile_rates",
-          "kind": "REST: Octopus"
-        },
-        {
-          "view": "ci_london",
-          "kind": "REST: NESO"
-        }
-      ]
-    },
-    {
-      "id": "E18",
-      "hypothesisId": "EXTRA",
-      "title": "Get operational log events for Brixton (S2) during the two windows to identify potential non-weather volume drivers",
-      "sql": "SELECT event_id, event_date, description\nFROM kilowhy.ops_log\nWHERE site_id = 'S2'\n  AND event_date >= (SELECT date_sub(CAST(MAX(ts) AS DATE), 56) FROM kilowhy.meter_hh WHERE site_id = 'S2')\nORDER BY event_date\nLIMIT 5000",
-      "zetarisRunId": "254bbd8e-5239-40c5-8aa8-9f7da9637be1",
-      "rowCount": 1,
-      "resultSha256": "06237166ad3f3d9201d962641c675338c78ced8d699fc04a12c0e32b0aae024f",
-      "sampleRows": [
-        {
-          "event_id": "E1",
-          "event_date": "2026-10-07",
-          "description": "SAMPLE: Oven schedule moved 2h later from this date (new sourdough line)."
-        }
-      ],
-      "metrics": {},
-      "sources": [
-        {
-          "view": "meter_hh",
-          "kind": "FILE: sample"
-        },
-        {
-          "view": "ops_log",
-          "kind": "FILE: sample"
-        }
-      ]
-    },
-    {
       "id": "E19",
       "hypothesisId": "REC",
       "title": "Counterfactual load shift on window-B prices (S2)",
       "sql": "SELECT m.site_id, m.ts, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, m.kwh, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nORDER BY m.site_id, m.ts",
-      "zetarisRunId": "3c718a47-81ea-4a37-9b3b-3b4c46aeb6aa",
+      "zetarisRunId": "7b693a0b-de0b-4d66-98d8-99ec823a3a7f",
       "rowCount": 2688,
       "resultSha256": "ee6b2d0a2928bd3a1b1f38c290049d6e799155842301a7f4a72e1e69f276e70a",
       "sampleRows": [
@@ -2796,7 +2974,7 @@
       "hypothesisId": "REC-TARIFF",
       "title": "Flat tariff vs Agile on the same kWh (S2)",
       "sql": "SELECT m.site_id, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win, COUNT(*) AS n_slots, SUM(m.kwh) AS kwh, SUM(m.kwh * r.p_kwh_inc_vat) AS agile_inc_pence, SUM(m.kwh * f.p_kwh_exc_vat) AS flat_exc_pence, SUM(f.standing_p_day_exc_vat) / 48.0 AS flat_standing_exc_pence, MIN(f.p_kwh_exc_vat) AS flat_rate_min_exc, MAX(f.p_kwh_exc_vat) AS flat_rate_max_exc\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start JOIN kilowhy.flat_tariff f ON m.ts >= f.valid_from AND (f.valid_to IS NULL OR m.ts < f.valid_to)\nWHERE m.site_id IN ('S2') AND m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nGROUP BY m.site_id, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END ORDER BY m.site_id, win",
-      "zetarisRunId": "6828dc84-be6b-4f66-aa41-f4b97d3a6742",
+      "zetarisRunId": "3919746b-3f3d-4af8-83d4-f701cb29c9d2",
       "rowCount": 2,
       "resultSha256": "5fb3ce4309018709f9f71dd87982a046c37852ce4ec61a6e2a20a5aff5715e88",
       "sampleRows": [
@@ -3392,7 +3570,7 @@
       "value": 0.084,
       "unit": "pp",
       "display": "0.1 pp",
-      "evidence": "E11",
+      "evidence": "E9",
       "hypothesis": "H5"
     },
     {
@@ -3402,7 +3580,7 @@
       "value": "S2",
       "unit": "text",
       "display": "S2",
-      "evidence": "E11",
+      "evidence": "E9",
       "hypothesis": "H5"
     },
     {
@@ -3412,7 +3590,7 @@
       "value": "night",
       "unit": "text",
       "display": "night",
-      "evidence": "E11",
+      "evidence": "E9",
       "hypothesis": "H5"
     },
     {
@@ -3422,7 +3600,7 @@
       "value": -8.2651,
       "unit": "pp",
       "display": "−8.3 pp",
-      "evidence": "E11",
+      "evidence": "E9",
       "hypothesis": "H5"
     },
     {
@@ -3432,7 +3610,7 @@
       "value": "2026-10-07",
       "unit": "date",
       "display": "2026-10-07",
-      "evidence": "E11",
+      "evidence": "E9",
       "hypothesis": "H5"
     },
     {
@@ -3442,7 +3620,7 @@
       "value": "SAMPLE: Oven schedule moved 2h later from this date (new sourdough line).",
       "unit": "text",
       "display": "SAMPLE: Oven schedule moved 2h later from this date (new sourdough line).",
-      "evidence": "E11",
+      "evidence": "E9",
       "hypothesis": "H5"
     },
     {
@@ -3452,7 +3630,7 @@
       "value": "2026-10-07",
       "unit": "date",
       "display": "2026-10-07",
-      "evidence": "E11",
+      "evidence": "E9",
       "hypothesis": "H5"
     },
     {
@@ -3462,7 +3640,7 @@
       "value": "2026-10-17",
       "unit": "date",
       "display": "2026-10-17",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3472,7 +3650,7 @@
       "value": 30.9572,
       "unit": "%",
       "display": "31.0%",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3482,7 +3660,7 @@
       "value": 32.4,
       "unit": "GBP",
       "display": "£32.40",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3492,7 +3670,7 @@
       "value": "average price on baseline day 2026-09-19 (window A)",
       "unit": "text",
       "display": "average price on baseline day 2026-09-19 (window A)",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3502,7 +3680,7 @@
       "value": -2.608,
       "unit": "sd",
       "display": "−2.6 sd",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3512,7 +3690,7 @@
       "value": "2026-10-09",
       "unit": "date",
       "display": "2026-10-09",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3522,7 +3700,7 @@
       "value": -20.02,
       "unit": "GBP",
       "display": "−£20.02",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3532,7 +3710,7 @@
       "value": "2026-09-21",
       "unit": "date",
       "display": "2026-09-21",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3542,7 +3720,7 @@
       "value": 2.6489,
       "unit": "sd",
       "display": "2.6 sd",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3552,7 +3730,7 @@
       "value": 5.1459,
       "unit": "kWh",
       "display": "5.1 kWh",
-      "evidence": "E9",
+      "evidence": "E11",
       "hypothesis": "H6"
     },
     {
@@ -3562,7 +3740,7 @@
       "value": 0,
       "unit": "count",
       "display": "0",
-      "evidence": "E15",
+      "evidence": "E13",
       "hypothesis": "H7"
     },
     {
@@ -3572,7 +3750,7 @@
       "value": 1,
       "unit": "count",
       "display": "1",
-      "evidence": "E15",
+      "evidence": "E13",
       "hypothesis": "H7"
     },
     {
@@ -3582,7 +3760,7 @@
       "value": 37.6525,
       "unit": "p/day",
       "display": "37.65 p/day",
-      "evidence": "E16",
+      "evidence": "E14",
       "hypothesis": "H8"
     },
     {
@@ -3592,7 +3770,7 @@
       "value": 37.6525,
       "unit": "p/day",
       "display": "37.65 p/day",
-      "evidence": "E16",
+      "evidence": "E14",
       "hypothesis": "H8"
     },
     {
@@ -3602,7 +3780,7 @@
       "value": 0,
       "unit": "count",
       "display": "0",
-      "evidence": "E17",
+      "evidence": "E15",
       "hypothesis": "H9"
     },
     {
@@ -3612,7 +3790,7 @@
       "value": 2,
       "unit": "count",
       "display": "2",
-      "evidence": "E17",
+      "evidence": "E15",
       "hypothesis": "H9"
     },
     {
@@ -3622,21 +3800,131 @@
       "value": 1344,
       "unit": "slots",
       "display": "1,344 slots",
-      "evidence": "E17",
+      "evidence": "E15",
       "hypothesis": "H9"
     },
     {
       "id": "F72",
+      "key": "delta_emissions",
+      "label": "Change in emissions, window B minus window A (location-based, grid carbon intensity)",
+      "value": 80.7113,
+      "unit": "kgCO2e",
+      "display": "80.7 kgCO2e",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F73",
+      "key": "emissions_A",
+      "label": "Emissions in window A",
+      "value": 320.4981,
+      "unit": "kgCO2e",
+      "display": "320.5 kgCO2e",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F74",
+      "key": "emissions_B",
+      "label": "Emissions in window B",
+      "value": 401.2094,
+      "unit": "kgCO2e",
+      "display": "401.2 kgCO2e",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F75",
+      "key": "avg_intensity_A",
+      "label": "Average grid carbon intensity in window A",
+      "value": 123.5584,
+      "unit": "gCO2/kWh",
+      "display": "123.6 gCO2/kWh",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F76",
+      "key": "avg_intensity_B",
+      "label": "Average grid carbon intensity in window B",
+      "value": 144.6952,
+      "unit": "gCO2/kWh",
+      "display": "144.7 gCO2/kWh",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F77",
+      "key": "emissions_volume",
+      "label": "Emissions change from using more or less electricity",
+      "value": 22.1036,
+      "unit": "kgCO2e",
+      "display": "22.1 kgCO2e",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F78",
+      "key": "emissions_volume_share",
+      "label": "Emissions change from using more or less electricity, as a share of the total emissions change",
+      "value": 27.386,
+      "unit": "%",
+      "display": "27.4%",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F79",
+      "key": "emissions_intensity",
+      "label": "Emissions change from a dirtier or cleaner grid",
+      "value": 65.8712,
+      "unit": "kgCO2e",
+      "display": "65.9 kgCO2e",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F80",
+      "key": "emissions_intensity_share",
+      "label": "Emissions change from a dirtier or cleaner grid, as a share of the total emissions change",
+      "value": 81.6133,
+      "unit": "%",
+      "display": "81.6%",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F81",
+      "key": "emissions_timing",
+      "label": "Emissions change from usage moving to dirtier or cleaner times",
+      "value": -7.2635,
+      "unit": "kgCO2e",
+      "display": "−7.3 kgCO2e",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F82",
+      "key": "emissions_timing_share",
+      "label": "Emissions change from usage moving to dirtier or cleaner times, as a share of the total emissions change",
+      "value": -8.9994,
+      "unit": "%",
+      "display": "−9.0%",
+      "evidence": "E16",
+      "hypothesis": "H10"
+    },
+    {
+      "id": "F83",
       "key": "max_abs_z",
       "label": "Largest distance of any site-day from its expected electricity, in standard deviations (4 or more is flagged)",
       "value": 2.6489,
       "unit": "sd",
       "display": "2.6 sd",
-      "evidence": "E13",
+      "evidence": "E17",
       "hypothesis": "H11"
     },
     {
-      "id": "F73",
+      "id": "F84",
       "key": "rec_saved",
       "label": "Load shift: money saved on window B prices",
       "value": 0.1,
@@ -3646,7 +3934,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F74",
+      "id": "F85",
       "key": "rec_saved_kg",
       "label": "Load shift: carbon saved",
       "value": 0.0213,
@@ -3656,7 +3944,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F75",
+      "id": "F86",
       "key": "rec_shifted_kwh",
       "label": "Load shift: electricity moved out of the 16:00-19:00 peak band",
       "value": 0.4075,
@@ -3666,7 +3954,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F76",
+      "id": "F87",
       "key": "rec_site_days",
       "label": "Load shift: site-days on which a shift saved money",
       "value": 2,
@@ -3676,7 +3964,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F77",
+      "id": "F88",
       "key": "peak_band",
       "label": "Peak band (local time)",
       "value": "16:00-19:00",
@@ -3686,7 +3974,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F78",
+      "id": "F89",
       "key": "rec_cap",
       "label": "Load shift: cap on the flexible load moved per site per day",
       "value": 10,
@@ -3696,7 +3984,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F79",
+      "id": "F90",
       "key": "rec_blocks",
       "label": "Load shift: cheapest same-day block(s) the load moves into (local time)",
       "value": "04:00-07:00",
@@ -3706,7 +3994,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F80",
+      "id": "F91",
       "key": "tariff_name",
       "label": "Comparison flat tariff (single unit rate, business, region C)",
       "value": "Flexible Octopus Business (August 2025)",
@@ -3716,7 +4004,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F81",
+      "id": "F92",
       "key": "flat_total_B",
       "label": "Flat tariff bill for the same kWh in window B (energy + standing, VAT at the contract rate)",
       "value": 949.42,
@@ -3726,7 +4014,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F82",
+      "id": "F93",
       "key": "agile_total_B",
       "label": "Actual Agile bill in window B (energy + standing)",
       "value": 779.34,
@@ -3736,7 +4024,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F83",
+      "id": "F94",
       "key": "flat_minus_agile_B",
       "label": "Flat tariff minus Agile in window B (positive: flat would cost more)",
       "value": 170.08,
@@ -3746,7 +4034,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F84",
+      "id": "F95",
       "key": "flat_total_A",
       "label": "Flat tariff bill for the same kWh in window A (energy + standing, VAT at the contract rate)",
       "value": 844.59,
@@ -3756,7 +4044,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F85",
+      "id": "F96",
       "key": "agile_total_A",
       "label": "Actual Agile bill in window A (energy + standing)",
       "value": 674.67,
@@ -3766,7 +4054,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F86",
+      "id": "F97",
       "key": "flat_minus_agile_A",
       "label": "Flat tariff minus Agile in window A (positive: flat would cost more)",
       "value": 169.92,
@@ -3776,7 +4064,7 @@
       "hypothesis": "REC"
     },
     {
-      "id": "F87",
+      "id": "F98",
       "key": "tariff_cheaper_B",
       "label": "Cheaper tariff in window B on the same kWh",
       "value": "agile",
@@ -3784,16 +4072,6 @@
       "display": "agile",
       "evidence": "E20",
       "hypothesis": "REC"
-    },
-    {
-      "id": "F88",
-      "key": "extra_1_rows",
-      "label": "Extra query 1 (Get operational log events for Brixton (S2) during the two windows to identify potential non-weather volume drivers): rows returned",
-      "value": 1,
-      "unit": "count",
-      "display": "1",
-      "evidence": "E18",
-      "hypothesis": "EXTRA"
     }
   ],
   "recommendation": {
@@ -3947,125 +4225,118 @@
     }
   },
   "answer": {
-    "headline": "Electricity use rose 179 kWh (6.9%) driven mainly by colder weather",
+    "headline": "The bill rose by £104.67 because colder weather drove higher usage and unit prices increased",
     "sentences": [
       {
-        "text": "Electricity use rose by 179 kWh (6.9%) from 2,594 kWh to 2,773 kWh, driven mainly by colder weather that raised heating degree days from 0.6 HDD to 45.0 HDD, with the weather-driven part of the volume effect accounting for £37.31 (35.6% of the bill change).",
+        "text": "The electricity bill increased by £104.67, with the largest share coming from higher unit prices that added £57.84 to the cost.",
         "facts": [
-          "F18",
-          "F19",
-          "F20",
-          "F21",
-          "F35",
-          "F36",
-          "F39",
-          "F40"
-        ],
-        "evidence": [
-          "E1",
-          "E5"
-        ]
-      },
-      {
-        "text": "The price-level effect added £57.84 (55.3% of the bill change), making it the largest single component of the bill increase.",
-        "facts": [
-          "F13",
-          "F14"
+          "F9",
+          "F13"
         ],
         "evidence": [
           "E1"
         ]
       },
       {
-        "text": "The generation mix shifted toward more expensive power, with wind share falling from 30.1% to 27.0% and gas share rising from 23.9% to 28.2%.",
+        "text": "Colder weather in window B added £37.31 to the bill through extra heating demand, accounting for 35.6% of the total change.",
         "facts": [
-          "F28",
-          "F29",
-          "F30",
-          "F31"
+          "F39",
+          "F40"
         ],
         "evidence": [
+          "E5"
+        ]
+      },
+      {
+        "text": "A single day on 2026-10-17 contributed 31.0% of the bill change because its baseline comparison day had unusually low prices −2.6 sd below average.",
+        "facts": [
+          "F55",
+          "F56",
+          "F59"
+        ],
+        "evidence": [
+          "E11"
+        ]
+      },
+      {
+        "text": "Overall electricity use rose by 179 kWh, and the generation mix shifted toward more gas and less wind −3.1 pp4.2 pp, which correlates with higher prices −0.34.",
+        "facts": [
+          "F20",
+          "F32",
+          "F33",
+          "F34"
+        ],
+        "evidence": [
+          "E1",
           "E4"
         ]
       },
       {
-        "text": "A single day on 2026-10-17 contributed £32.40 (31.0%) of the total bill change.",
+        "text": "The remaining usage increase beyond weather came from a one-off high-usage day 2026-09-21 that used 5.1 kWh more than expected for its conditions.",
         "facts": [
-          "F55",
-          "F56",
-          "F57"
+          "F62",
+          "F64"
         ],
         "evidence": [
-          "E9"
+          "E11"
         ]
       }
     ],
     "ruledOut": [
       {
-        "text": "Timing shift was ruled out; the change in peak-band share was only 0.1 pp and the largest daily-schedule move was −8.3 pp, below any material threshold.",
+        "text": "Usage timing shifted by only 0.1 pp toward peak hours, adding just £1.03 to the bill.",
         "facts": [
-          "F48",
-          "F51"
+          "F15",
+          "F48"
         ],
         "evidence": [
-          "E11"
+          "E1",
+          "E9"
         ],
         "hypothesis": "H5"
       },
       {
-        "text": "Meter fault was ruled out; zero meter faults were found across the one site checked.",
+        "text": "Standing charges stayed the same at 37.65 p/day per day, adding £0.00 to the bill change.",
+        "facts": [
+          "F17",
+          "F67"
+        ],
+        "evidence": [
+          "E1",
+          "E14"
+        ],
+        "hypothesis": "H8"
+      },
+      {
+        "text": "No single day exceeded the unusual usage threshold, with the largest deviation at 2.6 sd.",
+        "facts": [
+          "F83"
+        ],
+        "evidence": [
+          "E17"
+        ],
+        "hypothesis": "H11"
+      },
+      {
+        "text": "Meter checks found 0 faults across 1 site, ruling out meter error.",
         "facts": [
           "F65",
           "F66"
         ],
         "evidence": [
-          "E15"
-        ],
-        "hypothesis": "H7"
-      },
-      {
-        "text": "Tariff change was ruled out; the standing charge stayed at 37.65 p/day in both windows.",
-        "facts": [
-          "F67",
-          "F68"
-        ],
-        "evidence": [
-          "E16"
-        ],
-        "hypothesis": "H8"
-      },
-      {
-        "text": "Data gap was ruled out; zero site-windows had missing or extra half-hours across the two windows checked.",
-        "facts": [
-          "F69",
-          "F70"
-        ],
-        "evidence": [
-          "E17"
-        ],
-        "hypothesis": "H9"
-      },
-      {
-        "text": "Unusual usage day was ruled out; the largest deviation from expected usage was only 2.6 standard deviations, below the flagged level of 4 sd.",
-        "facts": [
-          "F72"
-        ],
-        "evidence": [
           "E13"
         ],
-        "hypothesis": "H11"
+        "hypothesis": "H7"
       }
     ],
     "recommendation": {
-      "text": "Load shifting out of the 16:00-19:00 peak band saved only £0.10 on window B prices by moving 0.4 kWh. The Agile tariff cost £779.34 in window B, £170.08 less than the flat tariff comparison of £949.42 for the same kWh; that flat-tariff figure is a historical counterfactual, not advice to switch.",
+      "text": "A historical counterfactual shows the flat tariff would have cost £170.08 more in window B and £169.92 more in window A for the same electricity. Load shifting could save up to £0.10 by moving 0.4 kWh into cheaper 04:00-07:00 periods.",
       "facts": [
-        "F73",
-        "F75",
-        "F77",
-        "F81",
-        "F82",
-        "F83",
-        "F87"
+        "F84",
+        "F86",
+        "F90",
+        "F94",
+        "F97"
       ],
       "evidence": [
         "E19",
@@ -4075,73 +4346,59 @@
   },
   "verification": {
     "passed": true,
-    "attempts": 2,
+    "attempts": 1,
     "errors": [],
     "errorDetail": [],
-    "history": [
-      {
-        "attempt": 1,
-        "errors": [
-          "sentences[2]: cites F41 (H4), but H4 is inconclusive; only supported causes belong in sentences (leave it out)",
-          "sentences[2]: cites F42 (H4), but H4 is inconclusive; only supported causes belong in sentences (leave it out)",
-          "sentences[4]: cites F15 (H5), but H5 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: cites F16 (H5), but H5 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: cites F17 (H8), but H8 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: cites F65 (H7), but H7 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: cites F66 (H7), but H7 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: cites F67 (H8), but H8 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: cites F68 (H8), but H8 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: cites F69 (H9), but H9 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: cites F70 (H9), but H9 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: cites F72 (H11), but H11 is ruled_out; only supported causes belong in sentences (put it in ruledOut)",
-          "sentences[4]: mentions ruling something out; ruled-out causes belong in ruledOut, not in sentences"
-        ]
-      }
-    ],
+    "history": [],
+    "repairs": [],
     "mode": "llm"
   },
   "llmCalls": [
-    {
-      "step": "intent",
-      "route": {
-        "provider": "meterless",
-        "requestedModel": "meterless/auto",
-        "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
-        "label": "Nemotron 3 Ultra 550B A55B",
-        "kind": "cloud",
-        "tier": "C",
-        "receiptId": "rcpt_req_t96z4a7p",
-        "raceWidth": 6,
-        "usage": {
-          "inputTokens": 1670,
-          "outputTokens": 178,
-          "totalTokens": 1848,
-          "outputTps": 89.2678034102307,
-          "routerLatencyMs": 1994
-        },
-        "latencyMs": 2134
-      }
-    },
     {
       "step": "plan",
       "route": {
         "provider": "meterless",
         "requestedModel": "meterless/deep",
-        "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
-        "label": "Nemotron 3 Ultra 550B A55B",
+        "routedModel": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "label": "Nemotron 3.5 Super VL 120B A12B",
         "kind": "cloud",
         "tier": "C",
-        "receiptId": "rcpt_req_ikrhkwtl",
-        "raceWidth": 6,
+        "receiptId": "rcpt_req_wstmifv4",
+        "raceWidth": null,
         "usage": {
-          "inputTokens": 4136,
-          "outputTokens": 1388,
-          "totalTokens": 5524,
-          "outputTps": 80.58522991175104,
-          "routerLatencyMs": 17224
+          "inputTokens": 18,
+          "outputTokens": 25,
+          "totalTokens": 43,
+          "outputTps": 0,
+          "routerLatencyMs": 4
         },
-        "latencyMs": 17360
-      }
+        "fromCache": true,
+        "latencyMs": 53
+      },
+      "wallMs": 82
+    },
+    {
+      "step": "intent",
+      "route": {
+        "provider": "meterless",
+        "requestedModel": "meterless/auto",
+        "routedModel": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+        "label": "Nemotron 3.5 Super VL 120B A12B",
+        "kind": "cloud",
+        "tier": "C",
+        "receiptId": "rcpt_req_n5cdaojg",
+        "raceWidth": null,
+        "usage": {
+          "inputTokens": 16,
+          "outputTokens": 16,
+          "totalTokens": 32,
+          "outputTps": 0,
+          "routerLatencyMs": 4
+        },
+        "fromCache": true,
+        "latencyMs": 46
+      },
+      "wallMs": 131
     },
     {
       "step": "narrative",
@@ -4155,49 +4412,29 @@
         "receiptId": null,
         "raceWidth": 1,
         "usage": {
-          "inputTokens": 3618,
-          "outputTokens": 5912,
-          "totalTokens": 9530,
+          "inputTokens": 2753,
+          "outputTokens": 511,
+          "totalTokens": 3264,
           "outputTps": null,
           "routerLatencyMs": null
         },
-        "fallbackReason": "meterless HTTP 502: 404: {\"status\":404,\"title\":\"Not Found\",\"detail\":\"Function '84bf12ff-edbd-4435-baea-0fa6a7453d2e': Not found for account 'YcpvB3_KNiubFlF1MpfDy9Ir9aYPcUtm-_8KW2VAD_c'\"}; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
-        "latencyMs": 64350
-      }
-    },
-    {
-      "step": "narrative (correction 1)",
-      "route": {
-        "provider": "meterless",
-        "requestedModel": "meterless/deep",
-        "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
-        "label": "Nemotron 3 Ultra 550B A55B",
-        "kind": "cloud",
-        "tier": "C",
-        "receiptId": "rcpt_req_6hpdp3go",
-        "raceWidth": 6,
-        "usage": {
-          "inputTokens": 18810,
-          "outputTokens": 4941,
-          "totalTokens": 23751,
-          "outputTps": 84.85171128780203,
-          "routerLatencyMs": 58231
-        },
-        "latencyMs": 64053
-      }
+        "fallbackReason": "meterless had not answered after 6s; the labelled fallback was started alongside; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
+        "latencyMs": 10004
+      },
+      "wallMs": 16007
     }
   ],
   "timings": {
-    "total": 282242,
-    "intent": 2150,
-    "decomposition": 3036,
-    "plan": 17377,
-    "hypotheses": 18643,
-    "extraSql": 7808,
-    "recommend": 23,
-    "recommendTariff": 12941,
-    "facts": 7,
-    "narrative": 218611
+    "total": 18431,
+    "plan": 83,
+    "sites": 248,
+    "intent": 131,
+    "data": 2076,
+    "hypotheses": 68,
+    "recommend": 6,
+    "extraSql": 0,
+    "facts": 4,
+    "narrative": 16018
   },
   "notes": [],
   "sampleDataNote": "Meter kWh are SAMPLE data (synthetic, Crumb & Co); Agile prices (Octopus), carbon intensity (NESO) and temperatures (Open-Meteo) are real public data."

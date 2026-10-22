@@ -32,14 +32,15 @@ export interface Plan {
   source: "llm" | "default";
 }
 
-export interface LlmCall { step: string; route?: Route; error?: string }
+export interface LlmCall { step: string; route?: Route; error?: string; wallMs?: number; rejected?: string }   // rejected: why the reply could not be used, with the start and end of its text   // wallMs: the whole call as the agent saw it, including a Meterless attempt that timed out before the fallback answered
 export interface Timings { total: number; [step: string]: number }   // milliseconds
 
 export interface Verification {
   passed: boolean; attempts: number; mode: "llm" | "template";
   errors: string[];                           // why the model's last attempt failed (empty when an LLM answer passed); template runs append their own check
   errorDetail: VerifyError[];
-  history: { attempt: number; errors: string[] }[];   // every failed narrative attempt with its verifier errors (what the corrections fixed)
+  history: { attempt: number; errors: string[]; repairs: string[] }[];   // every failed narrative attempt with its errors (what the corrections fixed)
+  repairs: string[];                          // repairs code applied to the accepted answer (digits turned into placeholders, sentences dropped for status contradictions)
 }
 
 export interface ScopeInfo { label: string; sites: { id: string; name: string }[]; windowA: DateWindow; windowB: DateWindow }

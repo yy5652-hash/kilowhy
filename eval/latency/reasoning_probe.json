@@ -1,0 +1,282 @@
+{
+  "generatedAt": "2026-10-22T02:31:28.478Z",
+  "promptChars": 7598,
+  "repeats": 3,
+  "summary": [
+    {
+      "variant": "baseline",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 0.6666666666666666,
+      "medianWallMs": 29649,
+      "medianOutputTokens": 2386,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ]
+    },
+    {
+      "variant": "cap500",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 0,
+      "leakRate": 0,
+      "medianWallMs": 6934,
+      "medianOutputTokens": 500,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ]
+    },
+    {
+      "variant": "no_think_line",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 0,
+      "leakRate": 0,
+      "medianWallMs": 9445,
+      "medianOutputTokens": 500,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ]
+    },
+    {
+      "variant": "thinking_off_line",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 0,
+      "leakRate": 0,
+      "medianWallMs": 7644,
+      "medianOutputTokens": 500,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ]
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 0,
+      "leakRate": 0,
+      "medianWallMs": 5527,
+      "medianOutputTokens": 500,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ]
+    },
+    {
+      "variant": "kwargs_and_line",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 0,
+      "leakRate": 0,
+      "medianWallMs": 6756,
+      "medianOutputTokens": 500,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ]
+    },
+    {
+      "variant": "reasoning_effort_low",
+      "n": 3,
+      "okRate": 1,
+      "jsonRate": 0,
+      "leakRate": 0,
+      "medianWallMs": 10471,
+      "medianOutputTokens": 500,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 135479,
+      "outputTokens": 3289,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true
+    },
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 29649,
+      "outputTokens": 2386,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true
+    },
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 16740,
+      "outputTokens": 1666,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": true,
+      "jsonOk": true
+    },
+    {
+      "variant": "cap500",
+      "ok": true,
+      "wallMs": 6934,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "cap500",
+      "ok": true,
+      "wallMs": 13967,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "cap500",
+      "ok": true,
+      "wallMs": 5816,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "no_think_line",
+      "ok": true,
+      "wallMs": 5403,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "no_think_line",
+      "ok": true,
+      "wallMs": 12829,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "no_think_line",
+      "ok": true,
+      "wallMs": 9445,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "thinking_off_line",
+      "ok": true,
+      "wallMs": 19727,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "thinking_off_line",
+      "ok": true,
+      "wallMs": 7377,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "thinking_off_line",
+      "ok": true,
+      "wallMs": 7644,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 11022,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 5527,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 5056,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "kwargs_and_line",
+      "ok": true,
+      "wallMs": 5863,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "kwargs_and_line",
+      "ok": true,
+      "wallMs": 14006,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "kwargs_and_line",
+      "ok": true,
+      "wallMs": 6756,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "reasoning_effort_low",
+      "ok": true,
+      "wallMs": 5723,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "reasoning_effort_low",
+      "ok": true,
+      "wallMs": 10625,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    },
+    {
+      "variant": "reasoning_effort_low",
+      "ok": true,
+      "wallMs": 10471,
+      "outputTokens": 500,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": false
+    }
+  ]
+}

@@ -63,7 +63,7 @@ const NV_CHAT = (model: string) => ({
   usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
 });
 
-type MlMode = "ok" | "500" | "400" | "slow" | "echo-token" | "tools";
+type MlMode = "ok" | "500" | "400" | "slow" | "echo-token" | "tools" | "cached";
 const nvDead = new Set<string>();
 const state = { ml: "ok" as MlMode, embed: "404" as "404" | "ok" | "garbage", models: "ok" as "ok" | "401" | "no-meterless" };
 
@@ -91,6 +91,11 @@ function mlHandler(req: Seen, res: ServerResponse) {
         choices: [{ message: { role: "assistant", content: null, tool_calls: [{ id: "call-1", type: "function", function: { name: "run_sql", arguments: "{\"sql\":\"SELECT 1\"}" } }] } }],
         meterless: receipt({ requested_model: "meterless/auto" }),
       });
+      case "cached": return json(res, 200, {
+        model: "nvidia/nemotron-3.5-super-vl-120b-a12b", usage: { prompt_tokens: 3, completion_tokens: 3, total_tokens: 6 },
+        choices: [{ message: { role: "assistant", content: "{\"cached\": true}" } }],
+        meterless: receipt({ from_cache: true, cache: { status: "exact" } }),
+      });
       default: return json(res, 200, {
         model: "nvidia/nemotron-3-ultra-550b-a55b", usage: { prompt_tokens: 21, completion_tokens: 9, total_tokens: 30 },
         choices: [{ message: { role: "assistant", content: "I should answer in JSON.</think>{\"answer\": 4}" } }],
@@ -106,9 +111,11 @@ function mlHandler(req: Seen, res: ServerResponse) {
   json(res, 404, { error: { message: "not_found" } });
 }
 
+let nvLimited = 0;   // answer this many chat requests with 429 before succeeding
 function nvHandler(req: Seen, res: ServerResponse) {
   if (req.headers.authorization !== `Bearer ${NV_KEY}`) return json(res, 401, { error: { message: "bad key" } });
   if (req.url === "/v1/chat/completions") {
+    if (nvLimited > 0) { nvLimited--; res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "0.2" }); return void res.end(JSON.stringify({ status: 429, title: "Too Many Requests" })); }
     if (nvDead.has(req.body.model)) return json(res, 404, { title: "Not Found", detail: "Function not found for account" });
     return json(res, 200, NV_CHAT(req.body.model));
   }
@@ -135,7 +142,7 @@ before(async () => {
   nv = await startMock(nvHandler);
 });
 after(async () => { await stop(ml); await stop(nv); });
-beforeEach(() => { nvDead.clear(); state.ml = "ok"; state.embed = "404"; state.models = "ok"; ml.seen.length = 0; nv.seen.length = 0; });
+beforeEach(() => { nvLimited = 0; nvDead.clear(); state.ml = "ok"; state.embed = "404"; state.models = "ok"; ml.seen.length = 0; nv.seen.length = 0; });
 
 describe("detectMeterless", () => {
   it("is online with a valid token and lists the meterless modes", async () => {
@@ -243,6 +250,23 @@ describe("chat through Meterless", () => {
     assert.equal(ml.seen.filter((s) => s.url === "/v1/chat/completions").at(-1)!.body.model, "meterless/auto");
   });
 
+  it("marks an answer that Nightshift served from its response cache", async () => {
+    state.ml = "cached";
+    const r = await make().provider.chat(ask());
+    assert.equal(r.route.fromCache, true);
+    state.ml = "ok";
+    assert.equal("fromCache" in (await make().provider.chat(ask())).route, false);
+  });
+
+  it("passes extra body fields through (for example chat_template_kwargs) without letting them override model or messages", async () => {
+    const { provider } = make();
+    await provider.chat({ mode: "deep", messages: [{ role: "user", content: "hi" }], extra: { chat_template_kwargs: { enable_thinking: false }, model: "evil/model", messages: [] } });
+    const body = ml.seen.find((s) => s.url === "/v1/chat/completions")!.body;
+    assert.deepEqual(body.chat_template_kwargs, { enable_thinking: false });
+    assert.equal(body.model, "meterless/deep");
+    assert.deepEqual(body.messages, [{ role: "user", content: "hi" }]);
+  });
+
   it("returns tool calls untouched and tolerates null content", async () => {
     state.ml = "tools";
     const tools = [{ type: "function", function: { name: "run_sql", parameters: { type: "object", properties: { sql: { type: "string" } } } } }];
@@ -316,6 +340,75 @@ describe("labelled NVIDIA fallback", () => {
     const r = await make({ timeoutMs: 250 }).provider.chat(ask());
     assert.equal(r.route.provider, "nvidia-direct");
     assert.match(r.route.fallbackReason ?? "", /timeout/);
+  });
+
+  it("a per-call deadline shorter than the provider timeout sends a hanging Meterless attempt to the labelled fallback", async () => {
+    state.ml = "slow";
+    const t0 = Date.now();
+    const r = await make({ timeoutMs: 3000 }).provider.chat({ ...ask(), deadlineMs: 250 });
+    assert.ok(Date.now() - t0 < 1200, "did not wait for the slow route");
+    assert.equal(r.route.provider, "nvidia-direct");
+    assert.equal(r.route.fallbackReason, "meterless timeout after 250ms");
+    assert.equal(nv.seen.length, 1);
+  });
+
+  it("retries the NVIDIA call after a 429 (Retry-After, then twice that) and gives up after the third", async () => {
+    state.ml = "500";
+    nvLimited = 1;
+    const t0 = Date.now();
+    const r = await make().provider.chat(ask());
+    assert.equal(r.route.provider, "nvidia-direct");
+    assert.equal(nv.seen.filter((s) => s.url === "/v1/chat/completions").length, 2);
+    assert.ok(Date.now() - t0 >= 180 && Date.now() - t0 < 1500);
+    nv.seen.length = 0; nvLimited = 2;
+    assert.equal((await make().provider.chat(ask())).route.provider, "nvidia-direct");
+    assert.equal(nv.seen.filter((s) => s.url === "/v1/chat/completions").length, 3);
+    nv.seen.length = 0; nvLimited = 3;
+    await assert.rejects(make().provider.chat(ask()), /HTTP 429/);
+    assert.equal(nv.seen.filter((s) => s.url === "/v1/chat/completions").length, 3);
+  });
+
+  it("direct skips Meterless entirely and labels the route with the given reason", async () => {
+    const r = await make().provider.chat({ ...ask(), direct: "the first narrative call failed: meterless timeout after 30s" });
+    assert.equal(r.route.provider, "nvidia-direct");
+    assert.equal(r.route.fallbackReason, "the first narrative call failed: meterless timeout after 30s");
+    assert.equal(ml.seen.filter((s) => s.url === "/v1/chat/completions").length, 0);
+    await assert.rejects(make({ fallback: false }).provider.chat({ ...ask(), direct: "x" }), /fallback is off/);
+  });
+
+  describe("hedging", () => {
+    it("a slow Meterless call is joined by the labelled NVIDIA call after hedgeAfterMs; the first answer wins", async () => {
+      state.ml = "slow";
+      const t0 = Date.now();
+      const r = await make({ timeoutMs: 3000 }).provider.chat({ ...ask(), hedgeAfterMs: 200 });
+      assert.ok(Date.now() - t0 < 1200, "did not wait for the slow route");
+      assert.equal(r.route.provider, "nvidia-direct");
+      assert.match(r.route.fallbackReason ?? "", /^meterless had not answered after 200ms; the labelled fallback was started alongside/);
+      assert.equal(nv.seen.length, 1);
+    });
+    it("a Meterless call that answers before the hedge never touches NVIDIA", async () => {
+      const r = await make().provider.chat({ ...ask(), hedgeAfterMs: 1000 });
+      assert.equal(r.route.provider, "meterless");
+      await new Promise((res) => setTimeout(res, 1200));
+      assert.equal(nv.seen.length, 0);
+    });
+    it("a Meterless error before the hedge uses the normal sequential fallback with the error as the reason", async () => {
+      state.ml = "500";
+      const r = await make().provider.chat({ ...ask(), hedgeAfterMs: 1000 });
+      assert.equal(r.route.provider, "nvidia-direct");
+      assert.match(r.route.fallbackReason ?? "", /HTTP 500/);
+      assert.equal(nv.seen.length, 1);
+    });
+    it("both calls failing gives one error that names both", async () => {
+      state.ml = "slow";
+      nvDead.add("nvidia/nemotron-3-super-120b-a12b"); nvDead.add("nvidia/nemotron-3-ultra-550b-a55b"); nvDead.add("nvidia/nemotron-3.5-lightning-30b-a3b");
+      await assert.rejects(make({ timeoutMs: 600 }).provider.chat({ ...ask(), hedgeAfterMs: 100 }), /timeout.*alongside NVIDIA call failed too|alongside NVIDIA call failed too/);
+    });
+    it("hedging is off when the fallback is off", async () => {
+      state.ml = "slow";
+      await assert.rejects(make({ fallback: false, timeoutMs: 400 }).provider.chat({ ...ask(), hedgeAfterMs: 100 }), /NVIDIA fallback is off|timeout/);
+      assert.equal(nv.seen.length, 0);
+    });
   });
 
   it("re-probes Meterless after a failure so it recovers on the next call", async () => {

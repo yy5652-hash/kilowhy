@@ -37,6 +37,8 @@ export interface DataLayer {
   siteIds(): Promise<string[]>;
   /** Site ids with their display names (kilowhy.sites). Optional: the agent falls back to the ids as names. */
   siteInfo?(): Promise<SiteInfo[]>;
+  /** Starts every query the hypotheses and recommendations will need for these sites, in parallel, so later fetches are cache hits. Never throws; evidence is created later by the fetchers, in their own order. */
+  prefetch?(q: { sites: string[]; windows: Windows }): Promise<void>;
   slots(q: { sites: string[]; windows: Windows }, meta: FetchMeta): Promise<Fetched<SlotRow>>;
   daily(q: { sites: string[]; windows: Windows }, meta: FetchMeta): Promise<Fetched<DailyRow>>;
   opsLog(q: { sites: string[] }, meta: FetchMeta): Promise<Fetched<OpsEvent>>;
@@ -170,6 +172,10 @@ export function createZetarisData(zsql: ZSql): DataLayer {
   };
   return {
     async siteIds() { return (await run(sitesSql())).rows.map((r) => str(r.site_id)); },
+    async prefetch(q) {
+      const sqls = [slotsSql(q.sites, q.windows), dailySql(q.sites, q.windows), opsLogSql(q.sites), contractSql(), qualitySql(q.sites, q.windows), coverageSql(q.sites, q.windows), tariffSql(q.sites, q.windows)];
+      await Promise.allSettled(sqls.map((sql) => run(sql)));
+    },
     async siteInfo() { return (await run(siteInfoSql())).rows.map((r) => ({ id: str(r.site_id), name: str(r.name) })); },
     slots: (q, meta) => fetched(slotsSql(q.sites, q.windows), [SRC.meter, SRC.rates, SRC.carbon], parseSlot, meta),
     daily: (q, meta) => fetched(dailySql(q.sites, q.windows), [SRC.meter, SRC.temp], parseDaily, meta),

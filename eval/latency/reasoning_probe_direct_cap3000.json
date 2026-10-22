@@ -1,0 +1,196 @@
+{
+  "generatedAt": "2026-10-22T02:40:01.805Z",
+  "mode": "deep",
+  "direct": true,
+  "promptChars": 7598,
+  "repeats": 2,
+  "summary": [
+    {
+      "variant": "baseline",
+      "n": 2,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 0,
+      "medianWallMs": 27309,
+      "medianOutputTokens": 1828,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "nvidia-direct"
+      ]
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "n": 2,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 0,
+      "medianWallMs": 7130,
+      "medianOutputTokens": 528,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "nvidia-direct"
+      ]
+    },
+    {
+      "variant": "thinking_disabled",
+      "n": 2,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 0,
+      "medianWallMs": 11026,
+      "medianOutputTokens": 529,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "nvidia-direct"
+      ]
+    },
+    {
+      "variant": "low_effort",
+      "n": 2,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 0,
+      "medianWallMs": 41037,
+      "medianOutputTokens": 2000,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "nvidia-direct"
+      ]
+    },
+    {
+      "variant": "reasoning_effort_obj",
+      "n": 2,
+      "okRate": 1,
+      "jsonRate": 1,
+      "leakRate": 0,
+      "medianWallMs": 66562,
+      "medianOutputTokens": 2625,
+      "models": [
+        "nvidia/nemotron-3-ultra-550b-a55b"
+      ],
+      "providers": [
+        "nvidia-direct"
+      ]
+    }
+  ],
+  "rows": [
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 31139,
+      "outputTokens": 2182,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{ \"headline\": \"Bill rose by {F9} driven mainly by higher wholesale prices and colder weather\", \"sent"
+    },
+    {
+      "variant": "baseline",
+      "ok": true,
+      "wallMs": 23479,
+      "outputTokens": 1473,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{ \"headline\": \"Bill rose by {F10} mainly due to higher wholesale prices and colder weather\", \"senten"
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 8231,
+      "outputTokens": 571,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{\"headline\": \"Your bill rose by {F9:abs} in the last {F2} days; you can act on the price level, extr"
+    },
+    {
+      "variant": "kwargs_enable_thinking",
+      "ok": true,
+      "wallMs": 6028,
+      "outputTokens": 484,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{\"headline\": \"Bill rose by {F9} with prices and cold weather driving most of the increase\", \"sentenc"
+    },
+    {
+      "variant": "thinking_disabled",
+      "ok": true,
+      "wallMs": 11129,
+      "outputTokens": 548,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{ \"headline\": \"Bill rose by {F9} across all three sites; shifting load out of the peak band and chec"
+    },
+    {
+      "variant": "thinking_disabled",
+      "ok": true,
+      "wallMs": 10922,
+      "outputTokens": 509,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{\"headline\": \"Bill rose by {F10} — price rises drove {F14} of the change; weather and one-off events"
+    },
+    {
+      "variant": "low_effort",
+      "ok": true,
+      "wallMs": 28138,
+      "outputTokens": 2209,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{\"headline\": \"Bill up {F10} – price rises and cold weather drove the increase\", \"sentences\": [{\"text"
+    },
+    {
+      "variant": "low_effort",
+      "ok": true,
+      "wallMs": 53935,
+      "outputTokens": 1791,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{ \"headline\": \"Bill up {F9} driven by higher prices {F13}\", \"sentences\": [ { \"text\": \"The electricit"
+    },
+    {
+      "variant": "reasoning_effort_obj",
+      "ok": true,
+      "wallMs": 73703,
+      "outputTokens": 2425,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{ \"headline\": \"Bill up {F9:abs}; price rise main driver\", \"sentences\": [ { \"text\": \"The electricity "
+    },
+    {
+      "variant": "reasoning_effort_obj",
+      "ok": true,
+      "wallMs": 59421,
+      "outputTokens": 2825,
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "leaked": false,
+      "jsonOk": true,
+      "provider": "nvidia-direct",
+      "preview": "{ \"headline\": \"Bill up {F9} ({F10}) – price rise biggest factor\", \"sentences\": [ { \"text\": \"Your bil"
+    }
+  ]
+}

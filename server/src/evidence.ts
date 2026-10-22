@@ -53,9 +53,12 @@ export class EvidenceStore {
 
   /** Reserves the next id of this investigation. */
   nextId(): string { return `E${++this.counter}`; }
+  /** Called with every record as it is registered (progress events); a listener error never breaks an investigation. */
+  onAdd?: (e: Evidence) => void;
   add(e: Evidence): Evidence {
     if (this.byId.has(e.id)) throw new Error(`duplicate evidence id ${e.id}`);
     this.items.push(e); this.byId.set(e.id, e);
+    try { this.onAdd?.(e); } catch { /* listeners must not break the store */ }
     return e;
   }
   get(id: string): Evidence | undefined { return this.byId.get(id); }

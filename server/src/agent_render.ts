@@ -21,7 +21,7 @@ export function routeLine(c: LlmCall): string {
   if (!c.route) return `${c.step}: FAILED ${c.error ?? ""}`.trim();
   const r = c.route;
   const model = r.routedModel ?? r.requestedModel;
-  return `${c.step}: ${model}${r.label ? ` (${r.label})` : ""} via ${r.provider}, ${(r.latencyMs / 1000).toFixed(1)} s${r.raceWidth ? `, race of ${r.raceWidth}` : ""}${r.fallbackReason ? " [fallback: " + r.fallbackReason.slice(0, 80) + "]" : ""}`;
+  return `${c.step}: ${model}${r.label ? ` (${r.label})` : ""} via ${r.provider}, ${(r.latencyMs / 1000).toFixed(1)} s${c.wallMs !== undefined && c.wallMs > r.latencyMs + 500 ? ` (${(c.wallMs / 1000).toFixed(1)} s wall)` : ""}${r.raceWidth ? `, race of ${r.raceWidth}` : ""}${r.fromCache ? ", from Nightshift cache" : ""}${r.fallbackReason ? " [fallback: " + r.fallbackReason.slice(0, 80) + "]" : ""}`;
 }
 
 export function renderAnswer(o: InvestigationResult): string {
@@ -38,7 +38,7 @@ export function renderAnswer(o: InvestigationResult): string {
   out.push("", `Verification: ${v.passed ? "PASSED" : "FAILED"}, mode ${v.mode}, ${v.attempts} narrative attempt(s)${v.errors.length ? `; ${v.mode === "template" ? "model attempts failed with" : "errors"}: ${v.errors.slice(0, 4).join(" | ").slice(0, 400)}` : ""}`);
   out.push(`Plan (${o.plan.source}): ${o.plan.hypotheses.join(", ")}${o.plan.added.length ? ` (added by code: ${o.plan.added.join(", ")})` : ""}${o.plan.extraSql.length ? `; extra SQL: ${o.plan.extraSql.map((x) => x.status).join(", ")}` : ""}`);
   out.push("LLM routes:", ...o.llmCalls.map((c) => `  ${routeLine(c)}`));
-  out.push(`Timings (ms): ${Object.entries(o.timings).map(([k, ms]) => `${k} ${ms}`).join(", ")}`);
+  out.push(`Timings (ms): ${Object.entries(o.timings).map(([k, ms]) => `${k} ${ms}`).join(", ")} [plan, intent and data run concurrently, so steps overlap]`);
   if (o.notes.length) out.push(`Notes: ${o.notes.join(" | ")}`);
   return out.join("\n");
 }

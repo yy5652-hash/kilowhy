@@ -44,7 +44,7 @@ export const sameTemp = (_w: Win, day: number): number => 11 + 4 * Math.sin(day 
 
 const slotIso = (date: string, slot: number): string => new Date(Date.parse(date + "T00:00:00Z") + slot * 1800e3).toISOString().replace(".000Z", "Z");
 
-export interface Synth { data: DataLayer; rows: SlotRow[]; windows: Windows; sites: string[]; opts: SynthOpts }
+export interface Synth { data: DataLayer; rows: SlotRow[]; windows: Windows; sites: string[]; opts: SynthOpts; prefetchCalls: string[][] }
 
 export function synth(o: SynthOpts = {}): Synth {
   const sites = o.sites ?? ["S1"];
@@ -73,7 +73,9 @@ export function synth(o: SynthOpts = {}): Synth {
   });
   const mine = (sitesQ: string[]) => rows.filter((r) => sitesQ.includes(r.site));
 
+  const prefetchCalls: string[][] = [];
   const data: DataLayer = {
+    async prefetch(q) { prefetchCalls.push(q.sites); },
     async siteIds() { return sites; },
     async siteInfo() { return sites.map((id) => ({ id, name: o.siteNames?.[id] ?? `Test Bakery ${id}` })); },
     async slots(q, meta) { const r = mine(q.sites); return wrap(meta, "slots", r, r as unknown as Row[], [{ view: "meter_hh", kind: "FILE: sample" }]); },
@@ -117,7 +119,7 @@ export function synth(o: SynthOpts = {}): Synth {
       return wrap(meta, "coverage", out, out as unknown as Row[], [{ view: "meter_hh", kind: "FILE: sample" }]);
     },
   };
-  return { data, rows, windows, sites, opts: o };
+  return { data, rows, windows, sites, opts: o, prefetchCalls };
 }
 
 /** Builds the investigation context over a synthetic data layer. */

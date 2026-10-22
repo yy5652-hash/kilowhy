@@ -7,6 +7,14 @@ export interface ChatMessage { role: "system" | "user" | "assistant" | "tool"; c
 export interface ToolCall { id: string; type: "function"; function: { name: string; arguments: string } }
 export interface ChatRequest {
   mode?: Mode; messages: ChatMessage[]; tools?: unknown[]; tool_choice?: unknown; max_tokens?: number; temperature?: number;
+  /** Extra body fields passed through to the endpoint (for example chat_template_kwargs). They never override model or messages. */
+  extra?: Record<string, unknown>;
+  /** Per-attempt deadline in ms (default: the provider's timeoutMs). A Meterless attempt that exceeds it falls back to the labelled NVIDIA route with a fallbackReason. */
+  deadlineMs?: number;
+  /** Hedge: if Meterless has not answered after this many ms, start the labelled NVIDIA call alongside it and use whichever answers first (the loser is cancelled). */
+  hedgeAfterMs?: number;
+  /** Skip Meterless and call the labelled NVIDIA route directly; the string becomes the route's fallbackReason (for example "the first call failed: ..."). */
+  direct?: string;
 }
 export interface Usage {
   inputTokens: number | null; outputTokens: number | null; totalTokens: number | null;
@@ -16,6 +24,7 @@ export interface Route {
   provider: "meterless" | "nvidia-direct";
   requestedModel: string; routedModel: string | null; label: string | null; kind: string | null; tier: string | null;
   latencyMs: number; receiptId: string | null; raceWidth: number | null; usage: Usage; fallbackReason?: string;
+  fromCache?: boolean;               // Nightshift answered from its response cache (identical request seen before): the latency says nothing about the model
 }
 export interface ChatResult { content: string; rawContent: string; toolCalls: ToolCall[]; route: Route }
 export interface EmbedResult { vectors: number[][]; route: Route }
@@ -59,6 +68,7 @@ export function configFromEnv(env: Record<string, string | undefined> = process.
 export class UpstreamError extends Error {
   status: number | null;
   retryable: boolean; // true: the endpoint itself is unavailable, so the labelled fallback may answer
+  retryAfterMs?: number; // from a Retry-After header (429)
   constructor(message: string, status: number | null, retryable: boolean) {
     super(message);
     this.name = "UpstreamError";

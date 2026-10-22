@@ -1,0 +1,481 @@
+{
+  "note": "Real measurements of scripts/ask.ts, 60 s apart, final D2e code. Before = the committed D2d eval/answers (commit d775782).",
+  "before": {
+    "q1": {
+      "question": "Why did our electricity cost more in the last four weeks than the four weeks before?",
+      "total_s": 278.303,
+      "timings_ms": {
+        "total": 278303,
+        "intent": 1133,
+        "decomposition": 9670,
+        "plan": 5695,
+        "hypotheses": 12188,
+        "extraSql": 0,
+        "recommend": 49,
+        "recommendTariff": 6317,
+        "facts": 20,
+        "narrative": 241288
+      },
+      "narrative_attempts": 2,
+      "mode": "llm",
+      "calls": [
+        {
+          "step": "intent",
+          "route": "meterless",
+          "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+          "latency_s": 1.108,
+          "fallback": false
+        },
+        {
+          "step": "plan",
+          "route": "meterless",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 5.685,
+          "fallback": false
+        },
+        {
+          "step": "narrative",
+          "route": "nvidia-direct",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 77.502,
+          "fallback": true
+        },
+        {
+          "step": "narrative (correction 1)",
+          "route": "meterless",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 73.569,
+          "fallback": false
+        }
+      ]
+    },
+    "q2": {
+      "question": "Why did Brixton use more electricity?",
+      "total_s": 282.242,
+      "timings_ms": {
+        "total": 282242,
+        "intent": 2150,
+        "decomposition": 3036,
+        "plan": 17377,
+        "hypotheses": 18643,
+        "extraSql": 7808,
+        "recommend": 23,
+        "recommendTariff": 12941,
+        "facts": 7,
+        "narrative": 218611
+      },
+      "narrative_attempts": 2,
+      "mode": "llm",
+      "calls": [
+        {
+          "step": "intent",
+          "route": "meterless",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 2.134,
+          "fallback": false
+        },
+        {
+          "step": "plan",
+          "route": "meterless",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 17.36,
+          "fallback": false
+        },
+        {
+          "step": "narrative",
+          "route": "nvidia-direct",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 64.35,
+          "fallback": true
+        },
+        {
+          "step": "narrative (correction 1)",
+          "route": "meterless",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 64.053,
+          "fallback": false
+        }
+      ]
+    },
+    "q3": {
+      "question": "What should we change to save money?",
+      "total_s": 348.708,
+      "timings_ms": {
+        "total": 348708,
+        "intent": 3673,
+        "decomposition": 4460,
+        "plan": 28047,
+        "hypotheses": 8603,
+        "extraSql": 1611,
+        "recommend": 44,
+        "recommendTariff": 2145,
+        "facts": 5,
+        "narrative": 297321
+      },
+      "narrative_attempts": 2,
+      "mode": "llm",
+      "calls": [
+        {
+          "step": "intent",
+          "route": "meterless",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 3.653,
+          "fallback": false
+        },
+        {
+          "step": "plan",
+          "route": "meterless",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 28.045,
+          "fallback": false
+        },
+        {
+          "step": "narrative",
+          "route": "nvidia-direct",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 85.004,
+          "fallback": true
+        },
+        {
+          "step": "narrative (correction 1)",
+          "route": "meterless",
+          "model": "nvidia/nemotron-3-ultra-550b-a55b",
+          "latency_s": 122.062,
+          "fallback": false
+        }
+      ]
+    }
+  },
+  "after": {
+    "q1": [
+      {
+        "run": 1,
+        "total_s": 28.443,
+        "mode": "llm",
+        "narrative_attempts": 1,
+        "repairs": 0,
+        "timings_ms": {
+          "total": 28443,
+          "plan": 82,
+          "sites": 267,
+          "intent": 137,
+          "data": 1682,
+          "hypotheses": 110,
+          "recommend": 15,
+          "extraSql": 0,
+          "facts": 4,
+          "narrative": 26355
+        },
+        "calls": [
+          {
+            "step": "plan",
+            "wall_s": 0.082,
+            "route": "meterless",
+            "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+            "latency_s": 0.052,
+            "from_cache": true,
+            "fallback_reason": null,
+            "error": null
+          },
+          {
+            "step": "intent",
+            "wall_s": 0.137,
+            "route": "meterless",
+            "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+            "latency_s": 0.045,
+            "from_cache": true,
+            "fallback_reason": null,
+            "error": null
+          },
+          {
+            "step": "narrative",
+            "wall_s": 26.345,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "latency_s": 20.343,
+            "from_cache": false,
+            "fallback_reason": "meterless had not answered after 6s; the labelled fallback was started alongside; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
+            "error": null
+          }
+        ]
+      },
+      {
+        "run": 2,
+        "total_s": 39.272,
+        "mode": "llm",
+        "narrative_attempts": 1,
+        "repairs": 0,
+        "timings_ms": {
+          "total": 39272,
+          "plan": 81,
+          "sites": 254,
+          "intent": 131,
+          "data": 1884,
+          "hypotheses": 113,
+          "recommend": 14,
+          "extraSql": 0,
+          "facts": 4,
+          "narrative": 36993
+        },
+        "calls": [
+          {
+            "step": "plan",
+            "wall_s": 0.081,
+            "route": "meterless",
+            "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+            "latency_s": 0.05,
+            "from_cache": true,
+            "fallback_reason": null,
+            "error": null
+          },
+          {
+            "step": "intent",
+            "wall_s": 0.131,
+            "route": "meterless",
+            "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+            "latency_s": 0.047,
+            "from_cache": true,
+            "fallback_reason": null,
+            "error": null
+          },
+          {
+            "step": "narrative",
+            "wall_s": 31.162,
+            "latency_s": null,
+            "from_cache": false,
+            "fallback_reason": null,
+            "error": "meterless timeout after 25s; the alongside NVIDIA call failed too: nvidia timeout after 25s"
+          },
+          {
+            "step": "narrative (direct retry)",
+            "wall_s": 5.821,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "latency_s": 5.82,
+            "from_cache": false,
+            "fallback_reason": "the first narrative call failed: meterless timeout after 25s; the alongside NVIDIA call failed too: nvidia timeout after 25s; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
+            "error": null
+          }
+        ]
+      }
+    ],
+    "q2": [
+      {
+        "run": 1,
+        "total_s": 38.581,
+        "mode": "llm",
+        "narrative_attempts": 2,
+        "repairs": 1,
+        "timings_ms": {
+          "total": 38581,
+          "plan": 80,
+          "sites": 184,
+          "intent": 108,
+          "data": 2716,
+          "hypotheses": 69,
+          "recommend": 6,
+          "extraSql": 0,
+          "facts": 4,
+          "narrative": 35592
+        },
+        "calls": [
+          {
+            "step": "plan",
+            "wall_s": 0.08,
+            "route": "meterless",
+            "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+            "latency_s": 0.051,
+            "from_cache": true,
+            "fallback_reason": null,
+            "error": null
+          },
+          {
+            "step": "intent",
+            "wall_s": 0.108,
+            "route": "meterless",
+            "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+            "latency_s": 0.043,
+            "from_cache": true,
+            "fallback_reason": null,
+            "error": null
+          },
+          {
+            "step": "narrative",
+            "wall_s": 14.886,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "latency_s": 8.883,
+            "from_cache": false,
+            "fallback_reason": "meterless had not answered after 6s; the labelled fallback was started alongside; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
+            "error": null
+          },
+          {
+            "step": "narrative (correction 1)",
+            "wall_s": 20.696,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "latency_s": 14.694,
+            "from_cache": false,
+            "fallback_reason": "meterless had not answered after 6s; the labelled fallback was started alongside; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
+            "error": null
+          }
+        ]
+      },
+      {
+        "run": 2,
+        "total_s": 18.431,
+        "mode": "llm",
+        "narrative_attempts": 1,
+        "repairs": 0,
+        "timings_ms": {
+          "total": 18431,
+          "plan": 83,
+          "sites": 248,
+          "intent": 131,
+          "data": 2076,
+          "hypotheses": 68,
+          "recommend": 6,
+          "extraSql": 0,
+          "facts": 4,
+          "narrative": 16018
+        },
+        "calls": [
+          {
+            "step": "plan",
+            "wall_s": 0.082,
+            "route": "meterless",
+            "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+            "latency_s": 0.053,
+            "from_cache": true,
+            "fallback_reason": null,
+            "error": null
+          },
+          {
+            "step": "intent",
+            "wall_s": 0.131,
+            "route": "meterless",
+            "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+            "latency_s": 0.046,
+            "from_cache": true,
+            "fallback_reason": null,
+            "error": null
+          },
+          {
+            "step": "narrative",
+            "wall_s": 16.007,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "latency_s": 10.004,
+            "from_cache": false,
+            "fallback_reason": "meterless had not answered after 6s; the labelled fallback was started alongside; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
+            "error": null
+          }
+        ]
+      }
+    ],
+    "q3": [
+      {
+        "run": 1,
+        "total_s": 31.701,
+        "mode": "llm",
+        "narrative_attempts": 1,
+        "repairs": 0,
+        "timings_ms": {
+          "total": 31701,
+          "sites": 271,
+          "intent": 8570,
+          "data": 2667,
+          "hypotheses": 114,
+          "recommend": 14,
+          "extraSql": 0,
+          "facts": 8,
+          "plan": 15916,
+          "narrative": 18839
+        },
+        "calls": [
+          {
+            "step": "intent",
+            "wall_s": 8.569,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "latency_s": 0.482,
+            "from_cache": false,
+            "fallback_reason": "meterless had not answered after 8s; the labelled fallback was started alongside",
+            "error": null
+          },
+          {
+            "step": "plan",
+            "wall_s": 15.915,
+            "route": "meterless",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "latency_s": 15.886,
+            "from_cache": false,
+            "fallback_reason": null,
+            "error": null
+          },
+          {
+            "step": "narrative",
+            "wall_s": 18.828,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "latency_s": 12.826,
+            "from_cache": false,
+            "fallback_reason": "meterless had not answered after 6s; the labelled fallback was started alongside; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
+            "error": null
+          }
+        ]
+      },
+      {
+        "run": 2,
+        "total_s": 25.38,
+        "mode": "llm",
+        "narrative_attempts": 1,
+        "repairs": 10,
+        "timings_ms": {
+          "total": 25380,
+          "sites": 265,
+          "plan": 9062,
+          "intent": 8800,
+          "data": 1720,
+          "hypotheses": 111,
+          "recommend": 15,
+          "extraSql": 0,
+          "facts": 8,
+          "narrative": 16296
+        },
+        "calls": [
+          {
+            "step": "plan",
+            "wall_s": 9.062,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "latency_s": 1.03,
+            "from_cache": false,
+            "fallback_reason": "meterless had not answered after 8s; the labelled fallback was started alongside; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
+            "error": null
+          },
+          {
+            "step": "intent",
+            "wall_s": 8.8,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "latency_s": 0.712,
+            "from_cache": false,
+            "fallback_reason": "meterless had not answered after 8s; the labelled fallback was started alongside",
+            "error": null
+          },
+          {
+            "step": "narrative",
+            "wall_s": 16.285,
+            "route": "nvidia-direct",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b",
+            "latency_s": 10.282,
+            "from_cache": false,
+            "fallback_reason": "meterless had not answered after 6s; the labelled fallback was started alongside; nemotron-3-super-120b-a12b not available on this NVIDIA account (404)",
+            "error": null
+          }
+        ]
+      }
+    ]
+  }
+}
