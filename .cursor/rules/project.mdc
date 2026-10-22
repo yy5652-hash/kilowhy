@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+- TypeScript, Node 24 (run .ts directly, no build step for scripts). No runtime deps unless needed.
+- Sample meter data is synthetic and must be labelled as sample data in every output.
+- Never print or commit secrets; read keys from keychain/env.
+- Keep files small; write a test or check for each script.

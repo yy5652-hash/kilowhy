@@ -1,0 +1,18 @@
+{
+  "name": "Kilowhy",
+  "track": "02 The Agent That Can Explain Why",
+  "sponsors": {
+    "zetaris": "All data (REST sources + sample files) queried through one local Zetaris SQL endpoint",
+    "meterless": {
+      "provider": "Nightshift (Runtime provider contract v4) as primary LLM provider, http://127.0.0.1:8088/v1",
+      "engines": {
+        "markovian": "bounded-carryover investigation chunks (planned D3)",
+        "hmem": "user corrections and confirmed causes with provenance (planned D3)",
+        "world-model": "sites, meters, contract, ops events as bitemporal entities (planned D3)"
+      }
+    },
+    "nvidia": "Nemotron models via Nightshift, direct NVIDIA API as labelled secondary route",
+    "cursor": "Cursor CLI used for generator and UI components; transcripts in docs/cursor-log/"
+  },
+  "pre_existing_open_source": ["meterless engines (Apache-2.0) vendored under vendor/ in D3"]
+}
