@@ -39,9 +39,10 @@ export interface InvestigateOpts {
   onProgress?: (step: string) => void;     // convenience: the name of every step as it starts
 }
 
-export const DEADLINES_MS = { intent: 20_000, plan: 30_000, narrative: 25_000 } as const;
+export const DEADLINES_MS = { intent: 20_000, plan: 30_000, narrative: 45_000 } as const;
 // Through Meterless the narrative takes 14-37 s (the model writes its reasoning as text first and often hits the token cap), NVIDIA direct with thinking off 3-9 s (docs/latency.md).
-export const HEDGE_AFTER_MS = { intent: 8_000, plan: 8_000, narrative: 6_000 } as const;
+// Nightshift is the primary provider (hackathon Power rule), so every step gives it a real head start; the labelled NVIDIA call only joins when Nightshift is slow or failing.
+export const HEDGE_AFTER_MS = { intent: 15_000, plan: 15_000, narrative: 35_000 } as const;
 export const PLAN_GRACE_MS = 4_000;   // the plan only orders the tests, so a late plan never holds up the narrative for long
 const DEFAULT_EMPHASIS: Record<IntentType, HypothesisId[]> = {
   why_cost_change: ["H1", "H2", "H3", "H4", "H5", "H6", "H11"], why_spike_day: ["H6", "H11", "H4", "H3", "H1"],

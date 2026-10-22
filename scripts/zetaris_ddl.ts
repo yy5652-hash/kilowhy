@@ -8,6 +8,7 @@ import { flatRatesEndpoint, flatStandingEndpoint, flatViewSql } from "../server/
 const DRY = process.argv.includes("--dry");
 const VIEWS_ONLY = process.argv.includes("--views-only");
 const FLAT_ONLY = process.argv.includes("--flat-only");
+const WARM_ONLY = process.argv.includes("--warm");
 const START = "2026-08-27"; // first day (UTC), 8 weeks ending 2026-10-21
 const END_EXCL = "2026-10-22";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
@@ -70,6 +71,12 @@ async function step(label: string, sql: string, wait = 0): Promise<boolean> {
   return r.ok;
 }
 
+// --warm: after a Zetaris restart the tables and views survive but CACHE TABLE (in memory) does not; re-cache every raw table, create nothing.
+if (WARM_ONLY) {
+  for (const f of ["meter_hh", "sites", "ops_log", "contract"]) await step(`cache ${f}`, `CACHE TABLE KILOWHY_FILES.${f}_raw`);
+  for (const s of sources) await step(`cache ${s.table}`, `CACHE TABLE ${T(s.table)}`, 3000);
+  process.exit(0);
+}
 if (!VIEWS_ONLY && !FLAT_ONLY) {
   await step("create db KILOWHY_REST", `CREATE LIGHTNING DATABASE KILOWHY_REST DESCRIBE BY "Kilowhy REST sources"`);
   await step("create db KILOWHY_FILES", `CREATE LIGHTNING DATABASE KILOWHY_FILES DESCRIBE BY "Kilowhy sample files"`);
