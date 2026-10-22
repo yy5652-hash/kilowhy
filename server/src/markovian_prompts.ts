@@ -63,7 +63,8 @@ export function checkReadings(ids: string[]): (v: unknown) => Checked<{ readings
 export function chunkFacts(facts: Fact[], hyps: HypInfo[], emphasis: string[], type: NarrativeInput["type"], state: ChainState): Fact[] {
   const cited = new Map<string, Set<string>>();       // test -> the facts its reading cites (a reading that cites none leaves the test's facts untouched)
   for (const [h, reading] of Object.entries(state.read)) { const ids = citedFacts(reading); if (ids.length && state.hyp[h] !== undefined) cited.set(h, new Set(ids)); }
-  return relevantFacts(facts, hyps, emphasis, type).filter((f) => !f.hypothesis || !cited.has(f.hypothesis) || cited.get(f.hypothesis)!.has(f.id));
+  const bearing = new Set(facts.flatMap((f) => f.memory?.bearsOn ?? []));
+  return relevantFacts(facts, hyps, emphasis, type).filter((f) => !f.hypothesis || !cited.has(f.hypothesis) || cited.get(f.hypothesis)!.has(f.id) || bearing.has(f.id));
 }
 
 /** The plain narrative prompt over the reduced facts, plus the carryover (the readings) and a fingerprint that includes it. */

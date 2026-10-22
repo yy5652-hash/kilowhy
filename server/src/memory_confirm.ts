@@ -20,7 +20,7 @@ export async function confirmCauses(memory: KilowhyMemory, r: InvestigationResul
   for (const h of r.results.filter((x) => x.status === "supported" && !NOT_CAUSES.has(x.id))) {
     const key = `cause:${r.scope.label}:${h.id}:${a.from}:${b.from}`;
     const title = CATALOG.find((c) => c.id === h.id)?.title ?? h.name;
-    const text = `${title} (${h.id}) was a supported cause of the change in the electricity ${r.intent.type === "why_emissions" ? "emissions" : "bill"} at ${where} between ${span}.`;
+    const text = `${title} (${h.id}) was a supported cause of the change in the electricity ${h.id === "H10" ? "emissions" : "bill"} at ${where} between ${span}.`;
     if (memory.findByKey(key)) { out.push({ id: memory.findByKey(key)!.id, hypothesis: h.id, text, site, skipped: true }); continue; }
     const zetarisRunIds = [...new Set(r.evidence.filter((e) => h.evidence.includes(e.id)).map((e) => e.zetarisRunId))];
     const p = memory.remember(text, { source: "agent", site, key, evidence: h.evidence, zetarisRunIds, receiptIds: receipts, label: `${h.id} supported in investigation "${r.question.slice(0, 80)}"` });

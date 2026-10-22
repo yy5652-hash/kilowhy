@@ -17,7 +17,7 @@ export interface RememberOpts {
   evidence?: string[]; zetarisRunIds?: string[]; receiptIds?: string[];   // provenance of an agent memory
   confidence?: number; label?: string; key?: string; layer?: "working" | "long_term";
 }
-export interface RecalledMemory { id: string; text: string; relevance: number; origin: MemoryOrigin; site?: string; learnedAt: string; validFrom?: string; confidence: number; layer: string; provenance: MemoryRecord["provenance"] }
+export interface RecalledMemory { id: string; text: string; relevance: number; origin: MemoryOrigin; site?: string; learnedAt: string; validFrom?: string; key?: string; confidence: number; layer: string; provenance: MemoryRecord["provenance"] }   // key: what an agent memory is about (cause:<scope>:<test>:<window A start>:<window B start>)
 export interface Recall { query: string; site?: string; memories: RecalledMemory[]; context: string; trace: QueryResult["trace"]; embed: { route: string; ms: number; fallback?: string } }
 
 export const USER_CONFIDENCE = 0.9, AGENT_CONFIDENCE = 0.7;   // what the owner says outranks what the agent concluded (AGENTS.md section 10.2: user_correction = high reliability)
@@ -40,6 +40,7 @@ const stamp = (ms: number): string => new Date(ms).toISOString();
 const siteOf = (m: MemoryRecord): string | undefined => m.chatId;
 const originOf = (m: MemoryRecord): MemoryOrigin => (m.source.startsWith("user") ? "user" : "agent");
 const validFromOf = (m: MemoryRecord): string | undefined => m.tags.find((t) => t.startsWith("valid_from:"))?.slice(11);
+const keyOf = (m: MemoryRecord): string | undefined => m.tags.find((t) => t.startsWith("key:"))?.slice(4);
 
 export class KilowhyMemory {
   readonly dir: string | null;
@@ -155,5 +156,5 @@ export class KilowhyMemory {
 }
 
 export function describeMemory(m: MemoryRecord): Omit<RecalledMemory, "relevance"> {
-  return { id: m.id, text: m.content, origin: originOf(m), site: siteOf(m), learnedAt: stamp(m.provenance.learnedAt), validFrom: validFromOf(m), confidence: m.confidence, layer: m.layer, provenance: m.provenance };
+  return { id: m.id, text: m.content, origin: originOf(m), site: siteOf(m), learnedAt: stamp(m.provenance.learnedAt), validFrom: validFromOf(m), key: keyOf(m), confidence: m.confidence, layer: m.layer, provenance: m.provenance };
 }

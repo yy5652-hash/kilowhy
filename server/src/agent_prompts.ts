@@ -85,6 +85,7 @@ export function relevantFacts(facts: Fact[], hyps: HypInfo[], emphasis: string[]
   const status = new Map(hyps.map((h) => [h.id, h.status]));
   const perRuledOut = new Map<string, number>();
   const off = offHypotheses(type);
+  const bearing = new Set(facts.flatMap((f) => f.memory?.bearsOn ?? []));   // facts a remembered note bears on stay in view
   return facts.filter((f) => {
     if (f.hypothesis && off.includes(f.hypothesis)) return false;
     if (!f.hypothesis || f.hypothesis === "REC" || f.hypothesis === "EXTRA") return true;
@@ -93,7 +94,7 @@ export function relevantFacts(facts: Fact[], hyps: HypInfo[], emphasis: string[]
     if (st !== "ruled_out") return false;
     const n = (perRuledOut.get(f.hypothesis) ?? 0) + 1;   // a ruled-out hypothesis needs only a few facts unless the planner stressed it
     perRuledOut.set(f.hypothesis, n);
-    return emphasis.includes(f.hypothesis) || n <= 3;
+    return emphasis.includes(f.hypothesis) || n <= 3 || bearing.has(f.id);
   });
 }
 
@@ -114,7 +115,7 @@ Rules:
 4. "recommendation": one or two sentences using the REC facts. ${i.hasRecommendation ? "A flat-tariff comparison must be called a historical counterfactual, not advice." : "There are no REC facts, so leave the text empty."}
 5. Say what each fact says, no more: do not give a figure a cause its description does not name. The data are synthetic SAMPLE meter readings; do not call them real measurements.
 6. "headline": one short line; placeholders allowed.${i.facts.some((f) => f.memory) ? `
-7. Facts whose id starts with M are notes remembered from earlier (the owner's, or an earlier investigation's). Cite one with its placeholder, for example {M1}, in the same sentence or ruled-out item as the test result it explains, never on its own; it may explain why a change happened but it is never a source of figures. If the test it bears on is not supported, mention it only in a ruledOut item for that test.` : ""}
+7. Facts whose id starts with M are notes remembered from earlier (the owner's, or an earlier investigation's). When a note's description says it bears on other facts, use the note together with those facts in the same sentence or ruled-out item: say what the facts show and that the note explains it, citing the note with its placeholder, for example {M1}. Attach a note only to the facts its description says it bears on, never to unrelated facts (a note about a schedule change on one date does not explain a different day). A note is never a source of figures on its own and never makes a test that is not supported a cause; if the test it bears on is not supported, mention it only in a ruledOut item for that test.` : ""}
 Hypotheses:
 ${statuses}
 Facts (id [hypothesis] description = value):

@@ -44,11 +44,25 @@ describe("a question with no memory yet", () => {
     const refs = rec.provenance.refs!;
     assert.ok(refs.some((r) => /^evidence:E\d+$/.test(r)) && refs.includes("zetaris-run:fake-run") && refs.includes("nightshift-receipt:rcpt_test"), refs.join(","));
     assert.ok(!/£|%|\d+\.\d/.test(rec.content), "no figures in a memory: they live in the evidence");
+    const h10 = o.memory!.written.find((w) => w.hypothesis === "H10");
+    if (h10) assert.match(h10.text, /change in the electricity emissions at/, "the carbon test is about emissions, not the bill");
     const w = events.find((e) => e.type === "memory" && e.action === "write") as Extract<ProgressEvent, { type: "memory"; action: "write" }>;
     assert.equal(w.written.length, supported.length);
     const again = (await ask(m, goodNarrative)).o;
     assert.ok(again.memory!.written.every((x) => x.skipped), "the same causes for the same windows are not written twice");
     assert.equal(m.list().length, supported.length);
+  });
+  it("findings of an earlier investigation of the same windows are not recalled again, those of other windows are", async () => {
+    const m = memory();
+    await ask(m, goodNarrative);                                      // writes the causes of windows A/B
+    const same = (await ask(m, goodNarrative)).o;
+    assert.equal(same.memory!.recalled.length, 0, "the same windows: the data says it again");
+    // a finding of an earlier month (other windows), as an earlier investigation would have left it
+    await m.remember("Weather-driven volume (H3) was a supported cause of the change in the electricity bill at Crumb & Co Brixton (S2) between window A 2026-07-30 to 2026-08-26 and window B 2026-08-27 to 2026-09-23.", { source: "agent", site: "S2", key: "cause:S2:H3:2026-07-30:2026-08-27" });
+    const other = (await ask(m, goodNarrative)).o;
+    assert.equal(other.memory!.recalled.length, 1); assert.equal(other.memory!.recalled[0].origin, "agent");
+    const f = other.facts.find((x) => x.id === "M1")!;
+    assert.match(f.display, /\(earlier investigation, 2026-11-01\)$/); assert.match(f.value as string, /between window A 2026-07-30 to 2026-08-26/);
   });
   it("no memory option: no memory fields, no events, nothing written", async () => {
     const events: ProgressEvent[] = [];

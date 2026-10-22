@@ -8,7 +8,7 @@ import { chat as providerChat } from "./provider.ts";
 import { createZetarisData, type DataLayer, type ZSql } from "./data.ts";
 import { KilowhyWorld } from "./worldmodel.ts";
 import type { KilowhyMemory, Recall } from "./memory.ts";
-import { memoryFacts, memorySnippets } from "./memory_facts.ts";
+import { linkNotes, memoryFacts, memorySnippets } from "./memory_facts.ts";
 import { confirmCauses, type WrittenMemory } from "./memory_confirm.ts";
 import { memoryReport, recallFor } from "./agent_memory.ts";
 import { runMarkovianChain } from "./investigate_markovian.ts";
@@ -112,7 +112,7 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   const label = (ids: string[]) => (ids.length === known.length ? "ALL" : ids.join("+"));
   let recall: Recall | null = null;
   const recallP = opts.memory ? recallFor(opts.memory, question, guess, known, emit) : null;
-  const planP = earlyPlanP ?? recallP!.then((r) => { recall = r; planMem = memorySnippets(memoryFacts(r, guess)); return startPlan(planMem); });
+  const planP = earlyPlanP ?? recallP!.then((r) => { recall = r; planMem = memorySnippets(memoryFacts(r, guess, { a: windowA.from, b: windowB.from })); return startPlan(planMem); });
   planP.catch(() => {});
   const specTimings: Record<string, number> = {};
   const specP = runScope({ data, siteIds: guess, label: label(guess), windowA, windowB, emit, timings: specTimings, world });
@@ -163,12 +163,13 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
     recall = await recallP;
     if (!sameIds(scope.siteIds, guess)) { recall = await recallFor(opts.memory!, question, scope.siteIds, known, emit); notes.push(`memory recalled again for ${scope.label}: the scope changed after the intent`); }
   }
-  const memFacts = memoryFacts(recall, scope.siteIds);
   const siteNames = Object.fromEntries(known.map((s) => [s.id, s.name]));
-  const facts = [...(await timed(emit, timings, "facts", async () => buildFacts({
+  const dataFacts = await timed(emit, timings, "facts", async () => buildFacts({
     scope: ctx.scope, siteNames, windowA, windowB, decomposition: dec, results, evidence, rec: loadShift, tariff,
     extras: extraSql.filter((x) => x.status === "ran" && x.evidence).map((x) => ({ purpose: x.purpose, evidence: x.evidence!, rows: x.rows ?? 0 })),
-  }))), ...memFacts];
+  }));
+  const memFacts = linkNotes(memoryFacts(recall, scope.siteIds, { a: windowA.from, b: windowB.from }), dataFacts, results);
+  const facts = [...dataFacts, ...memFacts];
   const rank = (id: string) => plan.hypotheses.indexOf(id as HypothesisId);
   const hyps: HypInfo[] = results.map((x) => ({ id: x.id, name: x.name, status: x.status })).sort((x, y) => rank(x.id) - rank(y.id));
   const vctx: VerifyCtx = { facts, evidenceIds: evidence.list().map((e) => e.id), hypotheses: hyps, requireRecommendation: facts.some((f) => f.hypothesis === "REC") };

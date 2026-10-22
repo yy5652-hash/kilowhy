@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { memoryFacts, memorySnippets } from "./memory_facts.ts";
+import { linkNotes, memoryFacts, memorySnippets } from "./memory_facts.ts";
 import type { Recall, RecalledMemory } from "./memory.ts";
 
 const m = (id: string, o: Partial<RecalledMemory>): RecalledMemory => ({ id, text: `text of ${id}`, relevance: 0.5, origin: "user", site: "S2", learnedAt: "2026-10-22T10:00:00.000Z", confidence: 0.9, layer: "long_term", provenance: { origin: "user_correction", learnedAt: 0, label: "x" }, ...o });
@@ -19,6 +19,11 @@ describe("memoryFacts", () => {
     const f = memoryFacts(recall([m("mem-1", { site: "S3" }), m("mem-2", { site: undefined }), m("mem-2", { site: undefined }), m("mem-4", { site: "S2" })]), ["S2"]);
     assert.deepEqual(f.map((x) => x.memory!.id), ["mem-2", "mem-4"]); assert.deepEqual(f.map((x) => x.id), ["M1", "M2"]);
     assert.deepEqual(memoryFacts(null, ["S2"]), []);
+  });
+  it("an agent finding for exactly the windows under investigation is left out; for other windows it stays", () => {
+    const r = recall([m("mem-1", { origin: "agent", key: "cause:S2:H3:2026-08-27:2026-09-24" }), m("mem-2", { origin: "agent", key: "cause:S2:H3:2026-07-30:2026-08-27" }), m("mem-3", {})]);
+    assert.deepEqual(memoryFacts(r, ["S2"], { a: "2026-08-27", b: "2026-09-24" }).map((f) => f.memory!.id), ["mem-2", "mem-3"]);
+    assert.deepEqual(memoryFacts(r, ["S2"]).map((f) => f.memory!.id), ["mem-1", "mem-2", "mem-3"], "without windows nothing is left out");
   });
   it("snippets for the plan prompt", () => {
     const f = memoryFacts(recall([m("mem-3", {}), m("mem-1", { origin: "agent", site: undefined })]), ["S2"]);
@@ -52,5 +57,23 @@ describe("the template mentions a remembered note next to the schedule change it
     const { templateAnswer } = await import("./agent_template.ts");
     const a = templateAnswer([...base, note("S3")], [{ id: "H5", name: "timing_shift", status: "ruled_out" as const }], "why_cost_change");
     assert.ok(!a.ruledOut.some((r) => r.facts.includes("M1")));
+  });
+});
+
+describe("linkNotes", () => {
+  const ev = (id: string, key: string, hyp: string, value: string) => ({ id, key, label: key, value, unit: "text", display: value, evidence: "E1", hypothesis: hyp });
+  const note = { id: "M1", key: "memory_1", label: "Remembered note", value: "Brixton moved its oven schedule 2 hours later from 7 Oct for the new sourdough line", unit: "text", display: "x", evidence: "",
+    memory: { id: "mem-6", origin: "user" as const, site: "S2", learnedAt: "2026-10-22T10:00:00.000Z", confidence: 0.9, relevance: 0.3 } };
+  const facts = [ev("F44", "event_1", "H4", "SAMPLE: Oven schedule moved 2h later from this date (new sourdough line)."), ev("F53", "schedule_event", "H5", "SAMPLE: Oven schedule moved 2h later from this date (new sourdough line)."), ev("F60", "event_2", "H6", "SAMPLE: One-off freezer fault; extra kWh consumed all day.")];
+  it("ties the note to logged-event facts that share two or more content words, but only those of tests that reach the narrative", () => {
+    const [m] = linkNotes([note], facts, [{ id: "H4", status: "inconclusive" }, { id: "H5", status: "ruled_out" }, { id: "H6", status: "ruled_out" }]);
+    assert.deepEqual(m.memory!.bearsOn, ["F53"]); assert.match(m.label, /Remembered note; bears on F53 \(same subject\)$/);
+    const [all] = linkNotes([note], facts, [{ id: "H4", status: "supported" }, { id: "H5", status: "ruled_out" }]);
+    assert.deepEqual(all.memory!.bearsOn, ["F44", "F53"]);
+  });
+  it("a note about something else, or sharing one word, is left alone", () => {
+    const other = { ...note, value: "The freezer at Hampstead is being replaced" };
+    assert.equal(linkNotes([other], facts, [{ id: "H6", status: "ruled_out" }])[0], other);
+    assert.equal(linkNotes([{ ...note, value: "Brixton schedule" }], facts, [{ id: "H5", status: "ruled_out" }])[0].memory!.bearsOn, undefined);
   });
 });

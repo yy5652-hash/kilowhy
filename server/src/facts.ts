@@ -22,7 +22,7 @@ export interface Fact {
   hypothesis?: string;        // H1..H11 when the fact belongs to one hypothesis; REC for the recommendation; absent for neutral facts
   memory?: FactMemory;        // M# facts only: a memory recalled from H-MEM (it has no E#: evidence is "")
 }
-export interface FactMemory { id: string; origin: "user" | "agent"; site?: string; learnedAt: string; validFrom?: string; confidence: number; relevance: number }
+export interface FactMemory { id: string; origin: "user" | "agent"; site?: string; learnedAt: string; validFrom?: string; confidence: number; relevance: number; bearsOn?: string[] }   // bearsOn: facts about the same subject (a logged event whose text overlaps the note)
 
 export interface FactsInput {
   scope: Scope;
