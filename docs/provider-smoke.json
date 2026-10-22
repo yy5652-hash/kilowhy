@@ -1,0 +1,72 @@
+{
+  "checked_at": "2026-10-22T00:32:58.213Z",
+  "nightshift": {
+    "status": "online",
+    "baseUrl": "http://127.0.0.1:8088/v1"
+  },
+  "fallback_enabled": true,
+  "deep": {
+    "ok": true,
+    "jsonParsed": true,
+    "answerCorrect": true,
+    "route": {
+      "provider": "meterless",
+      "requestedModel": "meterless/deep",
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "label": "Nemotron 3 Ultra 550B A55B",
+      "tier": "C",
+      "latencyMs": 828,
+      "raceWidth": 6,
+      "receiptId": "rcpt_req_126yjwp1"
+    }
+  },
+  "fast": {
+    "ok": true,
+    "replied": true,
+    "route": {
+      "provider": "meterless",
+      "requestedModel": "meterless/fast",
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "label": "Nemotron 3 Ultra 550B A55B",
+      "tier": "C",
+      "latencyMs": 11724,
+      "raceWidth": 6,
+      "receiptId": "rcpt_req_cvhgsxgn"
+    }
+  },
+  "tool_calling": {
+    "ok": true,
+    "toolCallsReturned": 1,
+    "toolName": "run_sql",
+    "argumentsParsed": true,
+    "workedViaNightshift": true,
+    "route": {
+      "provider": "meterless",
+      "requestedModel": "meterless/auto",
+      "routedModel": "nvidia/nemotron-3-ultra-550b-a55b",
+      "label": "Nemotron 3 Ultra 550B A55B",
+      "tier": "C",
+      "latencyMs": 1039,
+      "raceWidth": 6,
+      "receiptId": "rcpt_req_2q8b85mg"
+    }
+  },
+  "embed": {
+    "ok": true,
+    "count": 2,
+    "dims": 2048,
+    "route": {
+      "provider": "nvidia-direct",
+      "requestedModel": "nvidia/nemotron-3-embed-1b",
+      "routedModel": "nvidia/nemotron-3-embed-1b",
+      "label": "NVIDIA direct (Meterless fallback)",
+      "tier": null,
+      "latencyMs": 156,
+      "raceWidth": 1,
+      "receiptId": null,
+      "fallbackReason": "meterless HTTP 404: not_found"
+    }
+  },
+  "all_required_ok": true,
+  "failed": []
+}
