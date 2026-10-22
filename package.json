@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test \"scripts/**/*.test.ts\" \"server/**/*.test.ts\""
+    "test": "node --test \"scripts/**/*.test.ts\" \"server/**/*.test.ts\" \"eval/**/*.test.ts\""
   }
 }

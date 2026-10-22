@@ -31,3 +31,26 @@ The second answer carries the owner's note in the ruled-out timing item: "A timi
 ### Markovian token log
 
 Each chunk records the input tokens really sent (estimated as characters / 4, the reference engine's estimator, and measured where the provider reports usage) beside the reference's naive full-history estimate (every earlier prompt and output re-sent). Over the logged Brixton runs the chain sent about 3,700 to 4,000 estimated input tokens against about 6,700 to 7,200 for the naive full-history version, 44% less, with the carryover held at 160 to 300 estimated tokens per chunk. Raw rows: `eval/markovian_tokens.json`; plain loop against chain, live: `eval/latency/markovian_d3.json`.
+
+## Evaluation
+
+Question: how well does the deterministic layer (exact decomposition, hypotheses H1 to H11, load-shift recommendation) recover causes that are planted in meter data, on real market data? Everything runs through the injectable data layer, without Zetaris and without an LLM.
+
+- **Real windows.** Half-hourly Agile price (inc VAT), NESO carbon intensity, wind, gas and import share, and Open-Meteo hourly temperature for the two 28-day windows were read once from Zetaris into `eval/data/real_windows.json` (`node scripts/eval_snapshot.ts`; the file holds the SQL and the Zetaris run ids and no meter data).
+- **Planted causes.** A clean baseline bakery site (SAMPLE kWh from the sample-data generator with its dated events off) gets known causes: heating sensitivity, a sustained operational step up and down, an oven schedule moved into the 16:00 to 19:00 peak, a one-off fault day in window A and in window B, a zero run and a flatline, missing half-hours, a standing-charge change, and two combinations. That is 12 scenarios (`eval/scenarios.ts`). The expected status of H3 to H9 and H11 in each scenario was written down from the plants before the first run, and `eval/scenarios.test.ts` checks it against an independent calculation of the true series. Thresholds are the constants in `server/src/hypotheses/thresholds.ts`, unchanged.
+- **Run.** `node scripts/eval_run.ts` writes `eval/results/eval_report.md` (expected against got for every hypothesis and scenario, with the measured statistic beside its threshold) and `eval_report.json`; the run is deterministic.
+
+| Measure | Result |
+|---|---|
+| Scenarios, scored (scenario, hypothesis) pairs | 12, 91 |
+| Pairs answered exactly as expected | 83 of 91 |
+| "Supported" precision, recall, F1 | 100% (30 of 30), 93.8% (30 of 32), 96.8% |
+| Same, planted causes only | precision 100%, recall 94.1% (16 of 17) |
+| Wrong "supported" answers | 0 |
+| Answers that differ from the expectation | 8, all "inconclusive": 6 where the cause was not planted, 2 where it exists (one planted step, one real cold-snap effect); none is a wrong "ruled out" |
+| Decomposition identity V+L+T+S = bill change, within 0.01 GBP | 12 of 12 scenarios, largest error 5.5e-12 pence (compensated sum) |
+| Planted cause named correctly (event, day, change point, standing effect) | 16 of 17 |
+| H1, H2, H10 (real data only) against the status on the unplanted scenario | 36 of 36 |
+| Load-shift recommendation finds peak-band load exactly where it is planted | 12 of 12 |
+
+Full tables, the eight differing answers with their statistics, and the method: [`eval/results/eval_report.md`](eval/results/eval_report.md). The meter kWh in the evaluation are SAMPLE data; prices, carbon, generation mix and temperature are real.

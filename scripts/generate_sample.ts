@@ -182,6 +182,7 @@ function tempAt(temps: Map<string, number>, ms: number): number {
 function ovenWindow(
   site: Site,
   ms: number,
+  planted = true,
 ): { start: number; end: number } {
   const dow = weekdayUtc(ms);
   const date = dateKey(ms);
@@ -189,22 +190,23 @@ function ovenWindow(
   let end = dow === 0 ? site.sundayOvenEnd : site.ovenEndHour;
 
   // S2: from 2026-10-07 oven schedule moved 2h later
-  if (site.site_id === "S2" && date >= "2026-10-07") {
+  if (planted && site.site_id === "S2" && date >= "2026-10-07") {
     start += 2;
     end += 2;
   }
   return { start, end };
 }
 
-function ovenLoad(site: Site, ms: number): number {
+function ovenLoad(site: Site, ms: number, planted = true): number {
   const h = utcHourFraction(ms);
-  const { start, end } = ovenWindow(site, ms);
+  const { start, end } = ovenWindow(site, ms, planted);
   if (h >= start && h < end) return site.ovenKwh;
   return 0;
 }
 
 /** Extra opening / fault loads planted as dated events. */
-function eventLoad(site: Site, ms: number): number {
+function eventLoad(site: Site, ms: number, planted = true): number {
+  if (!planted) return 0;
   const date = dateKey(ms);
   const h = utcHourFraction(ms);
   const dow = weekdayUtc(ms);
@@ -234,20 +236,28 @@ export interface MeterRow {
   kwh: number;
 }
 
+/** The modelled loads of one slot (kWh, before noise). `planted = false` leaves out the dated sample events (the clean baseline used by eval/). */
+export function slotLoads(site: Site, ms: number, temps: Map<string, number>, planted = true): { base: number; oven: number; heating: number; events: number } {
+  return {
+    base: site.baseKwh,
+    oven: ovenLoad(site, ms, planted),
+    heating: site.heatingCoeff * Math.max(0, HEATING_BALANCE_C - tempAt(temps, ms)),
+    events: eventLoad(site, ms, planted),
+  };
+}
+
 export function generateMeterRows(
   temps: Map<string, number>,
   seed = 0xc0ffee,
+  opts: { plantedEvents?: boolean } = {},
 ): MeterRow[] {
+  const planted = opts.plantedEvents ?? true;
   const rand = mulberry32(seed);
   const rows: MeterRow[] = [];
 
   for (const site of SITES) {
     for (let ms = START_MS; ms <= END_MS; ms += SLOT_MS) {
-      const base = site.baseKwh;
-      const oven = ovenLoad(site, ms);
-      const temp = tempAt(temps, ms);
-      const heating = site.heatingCoeff * Math.max(0, HEATING_BALANCE_C - temp);
-      const events = eventLoad(site, ms);
+      const { base, oven, heating, events } = slotLoads(site, ms, temps, planted);
       // Small relative noise ±4% of (base+oven), floored at 0
       const noiseAmp = 0.04 * (base + oven + 0.5);
       const noise = (rand() * 2 - 1) * noiseAmp;

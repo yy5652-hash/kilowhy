@@ -1,0 +1,3044 @@
+{
+  "title": "Kilowhy evaluation: recovery of planted causes on real price, carbon and weather windows",
+  "sample_meter_data": true,
+  "note": "Meter kWh are SAMPLE data (synthetic, Crumb & Co site S1, generator seed 0xc0ffee, dated sample events switched off). Prices (Octopus Agile), carbon intensity and generation mix (NESO), and temperature (Open-Meteo) are the real series of eval/data/real_windows.json.",
+  "snapshot": {
+    "generatedAt": "2026-10-22T14:00:17.849Z",
+    "windows": {
+      "A": {
+        "id": "A",
+        "from": "2026-08-27",
+        "toExclusive": "2026-09-24",
+        "days": 28
+      },
+      "B": {
+        "id": "B",
+        "from": "2026-09-24",
+        "toExclusive": "2026-10-22",
+        "days": 28
+      }
+    },
+    "queries": [
+      {
+        "id": "slots",
+        "sql": "SELECT r.slot_start AS ts, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\nFROM kilowhy.agile_rates r LEFT JOIN kilowhy.ci_london c ON r.slot_start = c.slot_start\nWHERE r.slot_start >= timestamp '2026-08-27 00:00:00' AND r.slot_start < timestamp '2026-10-22 00:00:00' ORDER BY r.slot_start",
+        "zetarisRunId": "a3bc0c31-1f71-4c75-a5d4-2dc80287e206",
+        "rowCount": 2688,
+        "resultSha256": "4d6266022006feacaafc5119fe5fb72db6fbc34b644e8f16a15a3f90f9eafc2c"
+      },
+      {
+        "id": "temps",
+        "sql": "SELECT ts, temp_c FROM kilowhy.temp_hourly WHERE ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00' ORDER BY ts",
+        "zetarisRunId": "bdc9e499-d35b-431a-a746-ade2066b786f",
+        "rowCount": 1344,
+        "resultSha256": "916e627e957558f9457102845fd241be6d39e8aba2198b4244c67051a75581f6"
+      },
+      {
+        "id": "standing",
+        "sql": "SELECT CAST(valid_from AS STRING) AS valid_from, p_day_exc_vat, p_day_inc_vat FROM kilowhy.agile_standing ORDER BY valid_from",
+        "zetarisRunId": "870866c3-717d-4ee8-a2b3-a4d274dc0ff6",
+        "rowCount": 1,
+        "resultSha256": "204446bb0d33df24fe3edbb175d32bd0dff48757a9fcdd553040d431e9f84d00"
+      }
+    ]
+  },
+  "thresholds": {
+    "HDD_BASE_C": 15.5,
+    "H1_SHARE": 0.2,
+    "H2_GAS_PP": 3,
+    "H2_WIND_PP": 3,
+    "H2_CORR": -0.3,
+    "H3_T": 2,
+    "H3_SHARE": 0.1,
+    "H4_SHARE": 0.1,
+    "H4_T": 2,
+    "H4_MIN_DAYS_PER_SIDE": 5,
+    "H5_SHARE": 0.1,
+    "H6_SHARE": 0.25,
+    "H7_ZERO_RUN_SLOTS": 4,
+    "H7_FLATLINE_SLOTS": 12,
+    "SLOTS_PER_DAY": 48,
+    "H10_SHARE": 0.2,
+    "H11_Z": 4,
+    "H5_SHIFT_PP": 10,
+    "H5_SEGMENT_MIN_DAYS": 5,
+    "H5_EVENT_DAYS": 3,
+    "NEAR_MISS_FRACTION": 0.5,
+    "REC_MAX_KWH_PER_DAY": 10,
+    "REC_BLOCK_SLOTS": 6
+  },
+  "summary": {
+    "scenarios": 12,
+    "scenarios_passed": 5,
+    "scored_pairs": 91,
+    "exact_matches": 83,
+    "supported_class": {
+      "tp": 30,
+      "fp": 0,
+      "fn": 2,
+      "tn": 53,
+      "hedged": 6,
+      "fnHedged": 2,
+      "precision": 1,
+      "recall": 0.9375,
+      "f1": 0.967741935483871,
+      "n": 91
+    },
+    "planted_causes_only": {
+      "tp": 16,
+      "fp": 0,
+      "fn": 1,
+      "tn": 0,
+      "hedged": 0,
+      "fnHedged": 1,
+      "precision": 1,
+      "recall": 0.9411764705882353,
+      "f1": 0.9696969696969697,
+      "n": 17
+    },
+    "real_data_causes_only": {
+      "tp": 14,
+      "fp": 0,
+      "fn": 1,
+      "tn": 0,
+      "hedged": 0,
+      "fnHedged": 1,
+      "precision": 1,
+      "recall": 0.9333333333333333,
+      "f1": 0.9655172413793104,
+      "n": 15
+    },
+    "by_hypothesis": {
+      "H3": {
+        "tp": 11,
+        "fp": 0,
+        "fn": 1,
+        "tn": 0,
+        "hedged": 0,
+        "fnHedged": 1,
+        "precision": 1,
+        "recall": 0.9166666666666666,
+        "f1": 0.9565217391304348,
+        "n": 12
+      },
+      "H4": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 1,
+        "tn": 3,
+        "hedged": 6,
+        "fnHedged": 1,
+        "precision": 1,
+        "recall": 0.6666666666666666,
+        "f1": 0.8,
+        "n": 12
+      },
+      "H5": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "tn": 10,
+        "hedged": 0,
+        "fnHedged": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n": 12
+      },
+      "H6": {
+        "tp": 7,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "hedged": 0,
+        "fnHedged": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n": 7
+      },
+      "H7": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "tn": 10,
+        "hedged": 0,
+        "fnHedged": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n": 12
+      },
+      "H8": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "tn": 11,
+        "hedged": 0,
+        "fnHedged": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n": 12
+      },
+      "H9": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "tn": 11,
+        "hedged": 0,
+        "fnHedged": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n": 12
+      },
+      "H11": {
+        "tp": 4,
+        "fp": 0,
+        "fn": 0,
+        "tn": 8,
+        "hedged": 0,
+        "fnHedged": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1,
+        "n": 12
+      }
+    },
+    "decomposition_identity": {
+      "checked": 12,
+      "passed": 12,
+      "max_error_pence": 0,
+      "max_compensated_error_pence": 5.4569682106375694e-12,
+      "bound_pence": 1
+    },
+    "reference_statuses": {
+      "H1": "supported",
+      "H2": "supported",
+      "H10": "supported"
+    },
+    "reference_same": 36,
+    "reference_total": 36,
+    "identification": {
+      "checked": 17,
+      "found": 16
+    },
+    "recommendation": {
+      "matches": 12,
+      "total": 12
+    }
+  },
+  "scenarios": [
+    {
+      "n": 1,
+      "id": "baseline",
+      "title": "Nothing planted (real price and weather effects only)",
+      "because": "No cause is planted. Real windows: B is colder (heating kWh 46 -> 251) so weather carries ~43% of the change; the 17 Oct vs 19 Sep day pair carries ~31%.",
+      "plants": [],
+      "real_data_causes": [
+        "H3",
+        "H6"
+      ],
+      "not_scored": {},
+      "passed": false,
+      "exact_matches": 7,
+      "scored": 8,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 122.48,
+        "volumeGbp": 53.47,
+        "priceGbp": 69.84,
+        "timingGbp": -0.82,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 3.637978807091713e-12,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 122.48
+      },
+      "truth_shares": {
+        "weather": 0.4268,
+        "operational": 0,
+        "timing": 0.0067,
+        "largest_day": 0.3135,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.3433,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 34.3% of the change (rule >= 10.0%), beta t = 21.3 (rule >= 2)"
+          },
+          "headline": "beta 3.71 kWh/HDD (t 21.3, r2 0.96), sum HDD 0.6 -> 44.9: weather +£42.05 = 34% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "inconclusive",
+          "outcome": "tn_hedged",
+          "planted_cause": false,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.0932,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 9.3% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none"
+          },
+          "headline": "V_op +£11.42 = 9% of change; events with a daily-kWh step: none of 0"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0067,
+            "threshold": ">= 10.0%",
+            "text": "T = 0.7% of the change (rule >= 10.0%)"
+          },
+          "headline": "T -£0.82 = 1% of change; peak-band kWh share +0.1 pp; largest band move morning -0.7 pp"
+        },
+        {
+          "id": "H6",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest-day share of change",
+            "value": 0.3135,
+            "threshold": ">= 25.0%; ruled out below 12.5%",
+            "text": "top day 2026-10-17 = 31.4% of the change (rule >= 25.0%; ruled out below 12.5%)"
+          },
+          "headline": "top day 2026-10-17 = 31% of change (+£38.39); average price on baseline day 2026-09-19 (window A) is 2.6 sd below its window mean"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 2.76,
+            "threshold": ">= 4",
+            "text": "largest |z| 2.8 (rule >= 4), 0 flagged"
+          },
+          "headline": "no site-day beyond 4 sd (largest |z| 2.8: S1 2026-09-21)"
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.5702,
+            "threshold": ">= 20.0%",
+            "text": "L = 57.0% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£69.84 = 57% of change +£122.48; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 96.855,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 96.9 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 475 kgCO2e (+96.9): volume 25.9 (27%), intensity level 77.3 (80%), timing -6.4 (7%) kg"
+        }
+      ],
+      "identification": [],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 0,
+        "savedGbp": 0,
+        "daysShifted": 0,
+        "found": false,
+        "expectedFound": false,
+        "match": true,
+        "text": "No flexible peak-band load above the night baseline was found, so shifting would save nothing (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 2,
+      "id": "heating_up",
+      "title": "Heating sensitivity doubles from 3 Oct",
+      "because": "Extra heating makes weather-driven volume ~60% of the change. No operational step, timing change, fault day, meter, tariff or gap cause is planted.",
+      "plants": [
+        {
+          "kind": "heating",
+          "from": "2026-10-03",
+          "factor": 2
+        }
+      ],
+      "real_data_causes": [],
+      "not_scored": {
+        "H6": "exact largest-day share is ~25%, inside the rule's own inconclusive band"
+      },
+      "passed": false,
+      "exact_matches": 6,
+      "scored": 7,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 183.47,
+        "volumeGbp": 110.89,
+        "priceGbp": 74.64,
+        "timingGbp": -2.06,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 0,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 183.47
+      },
+      "truth_shares": {
+        "weather": 0.5979,
+        "operational": 0,
+        "timing": 0.0112,
+        "largest_day": 0.2487,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.4738,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 47.4% of the change (rule >= 10.0%), beta t = 34.4 (rule >= 2)"
+          },
+          "headline": "beta 7.68 kWh/HDD (t 34.4, r2 0.98), sum HDD 0.6 -> 44.9: weather +£86.92 = 47% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "inconclusive",
+          "outcome": "tn_hedged",
+          "planted_cause": false,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.1306,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 13.1% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none"
+          },
+          "headline": "V_op +£23.97 = 13% of change; events with a daily-kWh step: none of 0"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0112,
+            "threshold": ">= 10.0%",
+            "text": "T = 1.1% of the change (rule >= 10.0%)"
+          },
+          "headline": "T -£2.06 = 1% of change; peak-band kWh share +0.1 pp; largest band move morning -1.3 pp"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 2.52,
+            "threshold": ">= 4",
+            "text": "largest |z| 2.5 (rule >= 4), 0 flagged"
+          },
+          "headline": "no site-day beyond 4 sd (largest |z| 2.5: S1 2026-10-04)"
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.4068,
+            "threshold": ">= 20.0%",
+            "text": "L = 40.7% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£74.64 = 41% of change +£183.47; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 122.724,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 122.7 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 500.9 kgCO2e (+122.7): volume 53.7 (44%), intensity level 82.7 (67%), timing -13.6 (11%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 2,
+          "cause": "heating sensitivity x2 from 2026-10-03",
+          "found": null,
+          "detail": "H3 weather volume estimate £86.92 vs true £109.70 (ratio 0.79)"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 0,
+        "savedGbp": 0,
+        "daysShifted": 0,
+        "found": false,
+        "expectedFound": false,
+        "match": true,
+        "text": "No flexible peak-band load above the night baseline was found, so shifting would save nothing (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 3,
+      "id": "ops_step_up",
+      "title": "Operational step: +12 kWh/day from 6 Oct (extra opening), logged",
+      "because": "A sustained +12 kWh/day in the 05:00-09:00 UTC half-hours is ~27% of the change (volume only; timing effect ~1.5%).",
+      "plants": [
+        {
+          "kind": "step",
+          "from": "2026-10-06",
+          "kwhPerDay": 12,
+          "slots": [
+            10,
+            18
+          ],
+          "event": "Extra opening hours from this date."
+        }
+      ],
+      "real_data_causes": [
+        "H3"
+      ],
+      "not_scored": {
+        "H6": "exact largest-day share is ~23%, inside the rule's own inconclusive band"
+      },
+      "passed": true,
+      "exact_matches": 7,
+      "scored": 7,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 179.21,
+        "volumeGbp": 102.5,
+        "priceGbp": 73.94,
+        "timingGbp": 2.77,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 0,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 179.21
+      },
+      "truth_shares": {
+        "weather": 0.2917,
+        "operational": 0.2736,
+        "timing": 0.0155,
+        "largest_day": 0.2337,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.3561,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 35.6% of the change (rule >= 10.0%), beta t = 16.7 (rule >= 2)"
+          },
+          "headline": "beta 5.64 kWh/HDD (t 16.7, r2 0.93), sum HDD 0.6 -> 44.9: weather +£63.81 = 36% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.2159,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 21.6% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: E1"
+          },
+          "headline": "V_op +£38.69 = 22% of change; events with a daily-kWh step: E1 (t 7.3) of 1"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0155,
+            "threshold": ">= 10.0%",
+            "text": "T = 1.6% of the change (rule >= 10.0%)"
+          },
+          "headline": "T +£2.77 = 2% of change; peak-band kWh share -0.3 pp; largest band move morning +1.6 pp"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 2.39,
+            "threshold": ">= 4",
+            "text": "largest |z| 2.4 (rule >= 4), 0 flagged"
+          },
+          "headline": "no site-day beyond 4 sd (largest |z| 2.4: S1 2026-10-09)"
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.4126,
+            "threshold": ">= 20.0%",
+            "text": "L = 41.3% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£73.94 = 41% of change +£179.21; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 122.985,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 123.0 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 501.1 kgCO2e (+123): volume 49.6 (40%), intensity level 81.9 (67%), timing -8.5 (7%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 3,
+          "cause": "operational step +12 kWh/day from 2026-10-06",
+          "found": true,
+          "detail": "H4 events with a daily-kWh step: E1; planted event E1"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 0,
+        "savedGbp": 0,
+        "daysShifted": 0,
+        "found": false,
+        "expectedFound": false,
+        "match": true,
+        "text": "No flexible peak-band load above the night baseline was found, so shifting would save nothing (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 4,
+      "id": "schedule_shift",
+      "title": "Oven schedule moves 10 h later (into the 16-19 local peak) from 1 Oct, logged",
+      "because": "Energy-neutral move of the bake into dear half-hours; timing effect ~43% of the change; no volume change.",
+      "plants": [
+        {
+          "kind": "shift",
+          "from": "2026-10-01",
+          "hours": 10,
+          "event": "Oven schedule moved to the afternoon from this date."
+        }
+      ],
+      "real_data_causes": [
+        "H3"
+      ],
+      "not_scored": {
+        "H6": "exact largest-day share is ~20%, inside the rule's own inconclusive band"
+      },
+      "passed": false,
+      "exact_matches": 6,
+      "scored": 7,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 216.61,
+        "volumeGbp": 53.47,
+        "priceGbp": 69.84,
+        "timingGbp": 93.31,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 0,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 216.61
+      },
+      "truth_shares": {
+        "weather": 0.2413,
+        "operational": 0,
+        "timing": 0.4308,
+        "largest_day": 0.204,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.1941,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 19.4% of the change (rule >= 10.0%), beta t = 21.3 (rule >= 2)"
+          },
+          "headline": "beta 3.71 kWh/HDD (t 21.3, r2 0.96), sum HDD 0.6 -> 44.9: weather +£42.05 = 19% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "inconclusive",
+          "outcome": "tn_hedged",
+          "planted_cause": false,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.0527,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 5.3% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: E1"
+          },
+          "headline": "V_op +£11.42 = 5% of change; events with a daily-kWh step: E1 (t 3.4) of 1"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.4308,
+            "threshold": ">= 10.0%",
+            "text": "T = 43.1% of the change (rule >= 10.0%)"
+          },
+          "headline": "T +£93.31 = 43% of change; peak-band kWh share +17.8 pp; largest band move peak +17.8 pp; schedule shift at S1 (peak +17.8 pp from 2026-10-01)"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 2.76,
+            "threshold": ">= 4",
+            "text": "largest |z| 2.8 (rule >= 4), 0 flagged"
+          },
+          "headline": "no site-day beyond 4 sd (largest |z| 2.8: S1 2026-09-21)"
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.3224,
+            "threshold": ">= 20.0%",
+            "text": "L = 32.2% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£69.84 = 32% of change +£216.61; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 99.611,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 99.6 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 477.7 kgCO2e (+99.6): volume 25.9 (26%), intensity level 77.3 (78%), timing -3.6 (4%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 4,
+          "cause": "oven schedule shift from 2026-10-01",
+          "found": true,
+          "detail": "H5 schedule shift detected: true, band peak, change point 2026-10-01 (planted 2026-10-01)"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 210,
+        "savedGbp": 56.66,
+        "daysShifted": 21,
+        "found": true,
+        "expectedFound": true,
+        "match": true,
+        "text": "Move the peak-band (16:00-19:00) load above the night baseline (up to 10 kWh/day per site; 210 kWh in total over 27 days) into the cheapest 3-hour block of the same day (typically 12:00-15:00): saves £56.66 and 14.98 kgCO2e on window-B prices (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 5,
+      "id": "fault_day_A",
+      "title": "One-off fault day in A (16 Sep, oven on all day), logged",
+      "because": "The fault inflates window A, so it works AGAINST the bill increase: H6's day in the direction of the change is the real 17 Oct day, the fault is the opposite day; H11 should flag 16 Sep.",
+      "plants": [
+        {
+          "kind": "fault_day",
+          "date": "2026-09-16",
+          "kwhPerSlot": 4.6,
+          "event": "One-off oven thermostat fault; oven ran all day."
+        }
+      ],
+      "real_data_causes": [
+        "H3",
+        "H6"
+      ],
+      "not_scored": {},
+      "passed": false,
+      "exact_matches": 6,
+      "scored": 8,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 49.37,
+        "volumeGbp": -2.98,
+        "priceGbp": 53.03,
+        "timingGbp": -0.68,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 5.4569682106375694e-12,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 49.37
+      },
+      "truth_shares": {
+        "weather": 1.08,
+        "operational": 0,
+        "timing": 0.0137,
+        "largest_day": 0.7777,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "inconclusive",
+          "outcome": "fn_hedged",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.6609,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 66.1% of the change (rule >= 10.0%), beta t = 1.0 (rule >= 2)"
+          },
+          "headline": "beta 2.83 kWh/HDD (t 1, r2 0.19), sum HDD 0.6 -> 44.9: weather +£32.63 = 66% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "inconclusive",
+          "outcome": "tn_hedged",
+          "planted_cause": false,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.7213,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 72.1% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none"
+          },
+          "headline": "V_op -£35.61 = 72% of change; events with a daily-kWh step: none of 1"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0137,
+            "threshold": ">= 10.0%",
+            "text": "T = 1.4% of the change (rule >= 10.0%)"
+          },
+          "headline": "T -£0.68 = 1% of change; peak-band kWh share -0.4 pp; largest band move night +0.7 pp"
+        },
+        {
+          "id": "H6",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest-day share of change",
+            "value": 0.7777,
+            "threshold": ">= 25.0%; ruled out below 12.5%",
+            "text": "top day 2026-10-17 = 77.8% of the change (rule >= 25.0%; ruled out below 12.5%)"
+          },
+          "headline": "top day 2026-10-17 = 78% of change (+£38.39); average price on baseline day 2026-09-19 (window A) is 2.6 sd below its window mean"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 6.84,
+            "threshold": ">= 4",
+            "text": "largest |z| 6.8 (rule >= 4), 1 flagged"
+          },
+          "headline": "1 unusual site-day(s); largest S1 2026-09-16: 335.4 kWh vs 111.1 expected (z 6.8); ops_log E1 \"SAMPLE: One-off oven thermostat fault; oven ran all day.\""
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 1.074,
+            "threshold": ">= 20.0%",
+            "text": "L = 107.4% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£53.03 = 107% of change +£49.37; avg price on A shape 26.05 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 68.8,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 68.8 kgCO2e"
+          },
+          "headline": "emissions 406.2 -> 475 kgCO2e (+68.8): volume -1.4 (2%), intensity level 73.8 (107%), timing -3.6 (5%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 5,
+          "cause": "one-off fault day 2026-09-16",
+          "found": true,
+          "detail": "H11 flagged days: 2026-09-16"
+        },
+        {
+          "scenario": 5,
+          "cause": "one-off fault day 2026-09-16 as H6's day",
+          "found": false,
+          "detail": "H6 opposite day 2026-10-14 (a baseline-window fault works against the increase; largest day in the direction of the change: 2026-10-17)"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 0,
+        "savedGbp": 0,
+        "daysShifted": 0,
+        "found": false,
+        "expectedFound": false,
+        "match": true,
+        "text": "No flexible peak-band load above the night baseline was found, so shifting would save nothing (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 6,
+      "id": "fault_day_B",
+      "title": "One-off fault day in B (19 Oct, oven on all day), logged",
+      "because": "The fault day alone is ~40% of the change and the largest day; the fault also puts 13.8 kWh into the peak band that day.",
+      "plants": [
+        {
+          "kind": "fault_day",
+          "date": "2026-10-19",
+          "kwhPerSlot": 4.6,
+          "event": "One-off oven thermostat fault; oven ran all day."
+        }
+      ],
+      "real_data_causes": [
+        "H3"
+      ],
+      "not_scored": {},
+      "passed": true,
+      "exact_matches": 8,
+      "scored": 8,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 200.78,
+        "volumeGbp": 109.86,
+        "priceGbp": 74.55,
+        "timingGbp": 16.37,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 0,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 200.78
+      },
+      "truth_shares": {
+        "weather": 0.2604,
+        "operational": 0,
+        "timing": 0.0815,
+        "largest_day": 0.4214,
+        "largest_day_date": "2026-10-19"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.5456,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 54.6% of the change (rule >= 10.0%), beta t = 3.7 (rule >= 2)"
+          },
+          "headline": "beta 9.68 kWh/HDD (t 3.7, r2 0.38), sum HDD 0.6 -> 44.9: weather +£109.55 = 55% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.0015,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 0.1% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none"
+          },
+          "headline": "V_op +£0.30 = 0% of change; events with a daily-kWh step: none of 1"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0815,
+            "threshold": ">= 10.0%",
+            "text": "T = 8.2% of the change (rule >= 10.0%)"
+          },
+          "headline": "T +£16.37 = 8% of change; peak-band kWh share +0.4 pp; largest band move morning -1.6 pp"
+        },
+        {
+          "id": "H6",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "largest-day share of change",
+            "value": 0.4214,
+            "threshold": ">= 25.0%; ruled out below 12.5%",
+            "text": "top day 2026-10-19 = 42.1% of the change (rule >= 25.0%; ruled out below 12.5%)"
+          },
+          "headline": "top day 2026-10-19 = 42% of change (+£84.61); usage on 2026-10-19 (window B) is 5 sd above its window mean"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 6.84,
+            "threshold": ">= 4",
+            "text": "largest |z| 6.8 (rule >= 4), 1 flagged"
+          },
+          "headline": "1 unusual site-day(s); largest S1 2026-10-19: 351.4 kWh vs 131.3 expected (z 6.8); ops_log E1 \"SAMPLE: One-off oven thermostat fault; oven ran all day.\""
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.3713,
+            "threshold": ">= 20.0%",
+            "text": "L = 37.1% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£74.55 = 37% of change +£200.78; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 139.668,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 139.7 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 517.8 kgCO2e (+139.7): volume 53.2 (38%), intensity level 82.6 (59%), timing 4 (3%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 6,
+          "cause": "one-off fault day 2026-10-19",
+          "found": true,
+          "detail": "H11 flagged days: 2026-10-19"
+        },
+        {
+          "scenario": 6,
+          "cause": "one-off fault day 2026-10-19 as H6's day",
+          "found": true,
+          "detail": "H6 largest day 2026-10-19"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 10,
+        "savedGbp": 2.55,
+        "daysShifted": 1,
+        "found": true,
+        "expectedFound": true,
+        "match": true,
+        "text": "Move the peak-band (16:00-19:00) load above the night baseline (up to 10 kWh/day per site; 10 kWh in total over 27 days) into the cheapest 3-hour block of the same day (typically 00:00-03:00): saves £2.55 and 0.90 kgCO2e on window-B prices (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 7,
+      "id": "meter_fault",
+      "title": "Meter fault in B: zero run (9 Oct) and flatline (14 Oct)",
+      "because": "8 zero half-hours and 16 repeated readings are planted; the zero run removes ~47 kWh from 9 Oct (an anomalous day), the flatline repeats a normal night reading.",
+      "plants": [
+        {
+          "kind": "zero_run",
+          "date": "2026-10-09",
+          "fromSlot": 8,
+          "slots": 8
+        },
+        {
+          "kind": "flatline",
+          "date": "2026-10-14",
+          "fromSlot": 36,
+          "slots": 16
+        }
+      ],
+      "real_data_causes": [
+        "H3",
+        "H6"
+      ],
+      "not_scored": {},
+      "passed": true,
+      "exact_matches": 8,
+      "scored": 8,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 115.25,
+        "volumeGbp": 41.96,
+        "priceGbp": 68.88,
+        "timingGbp": 4.41,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 0,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 115.25
+      },
+      "truth_shares": {
+        "weather": 0.4536,
+        "operational": 0,
+        "timing": 0.0383,
+        "largest_day": 0.3331,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.4054,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 40.5% of the change (rule >= 10.0%), beta t = 7.2 (rule >= 2)"
+          },
+          "headline": "beta 4.13 kWh/HDD (t 7.2, r2 0.72), sum HDD 0.6 -> 44.9: weather +£46.72 = 41% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.0413,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 4.1% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none"
+          },
+          "headline": "V_op -£4.76 = 4% of change; events with a daily-kWh step: none of 0"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0383,
+            "threshold": ">= 10.0%",
+            "text": "T = 3.8% of the change (rule >= 10.0%)"
+          },
+          "headline": "T +£4.41 = 4% of change; peak-band kWh share +0.1 pp; largest band move morning -0.9 pp"
+        },
+        {
+          "id": "H6",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest-day share of change",
+            "value": 0.3331,
+            "threshold": ">= 25.0%; ruled out below 12.5%",
+            "text": "top day 2026-10-17 = 33.3% of the change (rule >= 25.0%; ruled out below 12.5%)"
+          },
+          "headline": "top day 2026-10-17 = 33% of change (+£38.39); average price on baseline day 2026-09-19 (window A) is 2.6 sd below its window mean"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "faults found",
+            "value": 2,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "1 zero run(s), 1 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "1 zero run(s), 1 flatline(s), 0 duplicate ts, 0 short day(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 6.53,
+            "threshold": ">= 4",
+            "text": "largest |z| 6.5 (rule >= 4), 1 flagged"
+          },
+          "headline": "1 unusual site-day(s); largest S1 2026-10-09: 69 kWh vs 113.5 expected (z -6.5); no ops_log event on that date"
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.5976,
+            "threshold": ">= 20.0%",
+            "text": "L = 59.8% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£68.88 = 60% of change +£115.25; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 94.111,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 94.1 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 472.2 kgCO2e (+94.1): volume 20.3 (22%), intensity level 76.3 (81%), timing -2.5 (3%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 7,
+          "cause": "zero run on 2026-10-09",
+          "found": true,
+          "detail": "H7 issues: zero_run 2026-10-09T04:00; flatline 2026-10-14T17:30"
+        },
+        {
+          "scenario": 7,
+          "cause": "zero-run day 2026-10-09 as an unusual day",
+          "found": true,
+          "detail": "H11 flagged days: 2026-10-09"
+        },
+        {
+          "scenario": 7,
+          "cause": "flatline on 2026-10-14",
+          "found": true,
+          "detail": "H7 issues: zero_run 2026-10-09T04:00; flatline 2026-10-14T17:30"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 0,
+        "savedGbp": 0,
+        "daysShifted": 0,
+        "found": false,
+        "expectedFound": false,
+        "match": true,
+        "text": "No flexible peak-band load above the night baseline was found, so shifting would save nothing (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 8,
+      "id": "data_gap",
+      "title": "Data gap in B: 30 missing half-hours (2 and 12 Oct)",
+      "because": "30 meter rows are missing: H9 (rows != 1344) and H7 (days without 48 slots) are both true by their definitions.",
+      "plants": [
+        {
+          "kind": "gap",
+          "date": "2026-10-02",
+          "fromSlot": 12,
+          "slots": 24
+        },
+        {
+          "kind": "gap",
+          "date": "2026-10-12",
+          "fromSlot": 30,
+          "slots": 6
+        }
+      ],
+      "real_data_causes": [
+        "H3"
+      ],
+      "not_scored": {
+        "H6": "H6 abstains by design when day pairs are incomplete (inconclusive), so no label exists for the observable data"
+      },
+      "passed": false,
+      "exact_matches": 6,
+      "scored": 7,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 113.64,
+        "volumeGbp": 53.36,
+        "priceGbp": 60.94,
+        "timingGbp": -0.66,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 5.4569682106375694e-12,
+        "identityOk": true,
+        "slotsKept": 1314,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 122.48
+      },
+      "truth_shares": {
+        "weather": 0.4268,
+        "operational": 0,
+        "timing": 0.0067,
+        "largest_day": 0.3135,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.3688,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 36.9% of the change (rule >= 10.0%), beta t = 21.0 (rule >= 2)"
+          },
+          "headline": "beta 3.74 kWh/HDD (t 21, r2 0.96), sum HDD 0.6 -> 44.3: weather +£41.91 = 37% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "inconclusive",
+          "outcome": "tn_hedged",
+          "planted_cause": false,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.1007,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 10.1% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none"
+          },
+          "headline": "V_op +£11.45 = 10% of change; events with a daily-kWh step: none of 0"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0058,
+            "threshold": ">= 10.0%",
+            "text": "T = 0.6% of the change (rule >= 10.0%)"
+          },
+          "headline": "T -£0.66 = 1% of change; peak-band kWh share +0.1 pp; largest band move morning -0.7 pp"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "faults found",
+            "value": 2,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 2 short day(s)"
+          },
+          "headline": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 2 short day(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 1,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "1 of 2 site-windows incomplete"
+          },
+          "headline": "1 of 2 site-windows have missing or extra rows"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 2.8,
+            "threshold": ">= 4",
+            "text": "largest |z| 2.8 (rule >= 4), 0 flagged"
+          },
+          "headline": "no site-day beyond 4 sd (largest |z| 2.8: S1 2026-09-21)"
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.5363,
+            "threshold": ">= 20.0%",
+            "text": "L = 53.6% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£60.94 = 54% of change +£113.64; avg price on A shape 25.65 -> 27.55 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.345,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 3.9 pp, wind -2.9 pp"
+          },
+          "headline": "wind -2.9 pp, gas +3.9 pp, imports -0.7 pp; corr(price, wind) in B = -0.35"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 89.641,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 89.6 kgCO2e"
+          },
+          "headline": "emissions 372.9 -> 462.5 kgCO2e (+89.6): volume 25.9 (29%), intensity level 70 (78%), timing -6.3 (7%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 8,
+          "cause": "missing meter rows on 2026-10-02",
+          "found": true,
+          "detail": "H9 supported, H7 supported: 1 of 2 site-windows have missing or extra rows"
+        },
+        {
+          "scenario": 8,
+          "cause": "missing meter rows on 2026-10-12",
+          "found": true,
+          "detail": "H9 supported, H7 supported: 1 of 2 site-windows have missing or extra rows"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 0,
+        "savedGbp": 0,
+        "daysShifted": 0,
+        "found": false,
+        "expectedFound": false,
+        "match": true,
+        "text": "No flexible peak-band load above the night baseline was found, so shifting would save nothing (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 9,
+      "id": "tariff_change",
+      "title": "Standing charge 37.65 -> 52.00 p/day from the start of B",
+      "because": "The contract row changes between the windows (S = +£4.02).",
+      "plants": [
+        {
+          "kind": "standing",
+          "from": "2026-09-24",
+          "pencePerDay": 52
+        }
+      ],
+      "real_data_causes": [
+        "H3",
+        "H6"
+      ],
+      "not_scored": {},
+      "passed": false,
+      "exact_matches": 7,
+      "scored": 8,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 126.5,
+        "volumeGbp": 53.47,
+        "priceGbp": 69.84,
+        "timingGbp": -0.82,
+        "standingGbp": 4.02,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 1.8189894035458565e-12,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 126.5
+      },
+      "truth_shares": {
+        "weather": 0.4132,
+        "operational": 0,
+        "timing": 0.0065,
+        "largest_day": 0.3046,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.3324,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 33.2% of the change (rule >= 10.0%), beta t = 21.3 (rule >= 2)"
+          },
+          "headline": "beta 3.71 kWh/HDD (t 21.3, r2 0.96), sum HDD 0.6 -> 44.9: weather +£42.05 = 33% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "inconclusive",
+          "outcome": "tn_hedged",
+          "planted_cause": false,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.0903,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 9.0% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none"
+          },
+          "headline": "V_op +£11.42 = 9% of change; events with a daily-kWh step: none of 0"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0065,
+            "threshold": ">= 10.0%",
+            "text": "T = 0.7% of the change (rule >= 10.0%)"
+          },
+          "headline": "T -£0.82 = 1% of change; peak-band kWh share +0.1 pp; largest band move morning -0.7 pp"
+        },
+        {
+          "id": "H6",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest-day share of change",
+            "value": 0.3046,
+            "threshold": ">= 25.0%; ruled out below 12.5%",
+            "text": "top day 2026-10-17 = 30.5% of the change (rule >= 25.0%; ruled out below 12.5%)"
+          },
+          "headline": "top day 2026-10-17 = 30% of change (+£38.54); average price on baseline day 2026-09-19 (window A) is 2.6 sd below its window mean"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 52",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 52 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "tariff or standing charge changed between the windows; standing-charge effect S = +£4.02"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 2.76,
+            "threshold": ">= 4",
+            "text": "largest |z| 2.8 (rule >= 4), 0 flagged"
+          },
+          "headline": "no site-day beyond 4 sd (largest |z| 2.8: S1 2026-09-21)"
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.5521,
+            "threshold": ">= 20.0%",
+            "text": "L = 55.2% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£69.84 = 55% of change +£126.50; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 96.855,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 96.9 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 475 kgCO2e (+96.9): volume 25.9 (27%), intensity level 77.3 (80%), timing -6.4 (7%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 9,
+          "cause": "standing charge change from 2026-09-24",
+          "found": true,
+          "detail": "H8 supported; standing effect S 4.02 GBP (true 4.02)"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 0,
+        "savedGbp": 0,
+        "daysShifted": 0,
+        "found": false,
+        "expectedFound": false,
+        "match": true,
+        "text": "No flexible peak-band load above the night baseline was found, so shifting would save nothing (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 10,
+      "id": "ops_step_down",
+      "title": "Operational decrease: -10 kWh/day from 8 Oct (early shift dropped), logged",
+      "because": "A sustained -10 kWh/day is ~54% of the (smaller) change; the real 17 Oct day is ~47% of it.",
+      "plants": [
+        {
+          "kind": "step",
+          "from": "2026-10-08",
+          "kwhPerDay": -10,
+          "slots": [
+            10,
+            18
+          ],
+          "event": "Early shift dropped from this date."
+        }
+      ],
+      "real_data_causes": [
+        "H3",
+        "H6"
+      ],
+      "not_scored": {},
+      "passed": false,
+      "exact_matches": 7,
+      "scored": 8,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 81.98,
+        "volumeGbp": 17.71,
+        "priceGbp": 66.85,
+        "timingGbp": -2.58,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 5.4569682106375694e-12,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 81.98
+      },
+      "truth_shares": {
+        "weather": 0.6377,
+        "operational": 0.4361,
+        "timing": 0.0315,
+        "largest_day": 0.4328,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.2806,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 28.1% of the change (rule >= 10.0%), beta t = 6.5 (rule >= 2)"
+          },
+          "headline": "beta 2.03 kWh/HDD (t 6.5, r2 0.83), sum HDD 0.6 -> 44.9: weather +£23.00 = 28% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "supported",
+          "got": "inconclusive",
+          "outcome": "fn_hedged",
+          "planted_cause": true,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.0645,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 6.5% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: E1"
+          },
+          "headline": "V_op -£5.29 = 6% of change; events with a daily-kWh step: E1 (t -3.8) of 1"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0315,
+            "threshold": ">= 10.0%",
+            "text": "T = 3.1% of the change (rule >= 10.0%)"
+          },
+          "headline": "T -£2.58 = 3% of change; peak-band kWh share +0.3 pp; largest band move morning -2.5 pp"
+        },
+        {
+          "id": "H6",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest-day share of change",
+            "value": 0.4328,
+            "threshold": ">= 25.0%; ruled out below 12.5%",
+            "text": "top day 2026-10-17 = 43.3% of the change (rule >= 25.0%; ruled out below 12.5%)"
+          },
+          "headline": "top day 2026-10-17 = 43% of change (+£35.48); average price on baseline day 2026-09-19 (window A) is 2.6 sd below its window mean"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 3.07,
+            "threshold": ">= 4",
+            "text": "largest |z| 3.1 (rule >= 4), 0 flagged"
+          },
+          "headline": "no site-day beyond 4 sd (largest |z| 3.1: S1 2026-10-15)"
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.8154,
+            "threshold": ">= 20.0%",
+            "text": "L = 81.5% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£66.85 = 82% of change +£81.98; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 79.867,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 79.9 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 458 kgCO2e (+79.9): volume 8.6 (11%), intensity level 74 (93%), timing -2.7 (3%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 10,
+          "cause": "operational step -10 kWh/day from 2026-10-08",
+          "found": true,
+          "detail": "H4 events with a daily-kWh step: E1; planted event E1"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 0,
+        "savedGbp": 0,
+        "daysShifted": 0,
+        "found": false,
+        "expectedFound": false,
+        "match": true,
+        "text": "No flexible peak-band load above the night baseline was found, so shifting would save nothing (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 11,
+      "id": "shift_and_step",
+      "title": "Combination: oven shift to the peak (1 Oct) + operational step +12 kWh/day (8 Oct)",
+      "because": "Both causes are planted at the sizes of scenarios 3 and 4; each stays above its threshold in the larger change.",
+      "plants": [
+        {
+          "kind": "shift",
+          "from": "2026-10-01",
+          "hours": 10,
+          "event": "Oven schedule moved to the afternoon from this date."
+        },
+        {
+          "kind": "step",
+          "from": "2026-10-08",
+          "kwhPerDay": 12,
+          "slots": [
+            10,
+            18
+          ],
+          "event": "Extra opening hours from this date."
+        }
+      ],
+      "real_data_causes": [
+        "H3"
+      ],
+      "not_scored": {
+        "H6": "exact largest-day share is ~17%, inside the rule's own inconclusive band"
+      },
+      "passed": true,
+      "exact_matches": 7,
+      "scored": 7,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 265.21,
+        "volumeGbp": 96.37,
+        "priceGbp": 73.43,
+        "timingGbp": 95.42,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 0,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 265.21
+      },
+      "truth_shares": {
+        "weather": 0.1971,
+        "operational": 0.1618,
+        "timing": 0.3598,
+        "largest_day": 0.1798,
+        "largest_day_date": "2026-10-17"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": false,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.2447,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 24.5% of the change (rule >= 10.0%), beta t = 16.6 (rule >= 2)"
+          },
+          "headline": "beta 5.73 kWh/HDD (t 16.6, r2 0.93), sum HDD 0.6 -> 44.9: weather +£64.90 = 24% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.1187,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 11.9% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: E1,E2"
+          },
+          "headline": "V_op +£31.47 = 12% of change; events with a daily-kWh step: E1 (t 4.8), E2 (t 6.1) of 2"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.3598,
+            "threshold": ">= 10.0%",
+            "text": "T = 36.0% of the change (rule >= 10.0%)"
+          },
+          "headline": "T +£95.42 = 36% of change; peak-band kWh share +16.6 pp; largest band move night -16.7 pp; schedule shift at S1 (night -16.7 pp from 2026-10-01)"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 2.49,
+            "threshold": ">= 4",
+            "text": "largest |z| 2.5 (rule >= 4), 0 flagged"
+          },
+          "headline": "no site-day beyond 4 sd (largest |z| 2.5: S1 2026-10-09)"
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.2769,
+            "threshold": ">= 20.0%",
+            "text": "L = 27.7% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£73.43 = 28% of change +£265.21; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 119.997,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 120.0 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 498.1 kgCO2e (+120): volume 46.6 (39%), intensity level 81.3 (68%), timing -7.9 (7%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 11,
+          "cause": "oven schedule shift from 2026-10-01",
+          "found": true,
+          "detail": "H5 schedule shift detected: true, band night, change point 2026-10-01 (planted 2026-10-01)"
+        },
+        {
+          "scenario": 11,
+          "cause": "operational step +12 kWh/day from 2026-10-08",
+          "found": true,
+          "detail": "H4 events with a daily-kWh step: E1,E2; planted event E2"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 210,
+        "savedGbp": 56.66,
+        "daysShifted": 21,
+        "found": true,
+        "expectedFound": true,
+        "match": true,
+        "text": "Move the peak-band (16:00-19:00) load above the night baseline (up to 10 kWh/day per site; 210 kWh in total over 27 days) into the cheapest 3-hour block of the same day (typically 12:00-15:00): saves £56.66 and 14.98 kgCO2e on window-B prices (SAMPLE meter data)."
+      }
+    },
+    {
+      "n": 12,
+      "id": "fault_and_heating",
+      "title": "Combination: one-off fault day in B (19 Oct) + heating sensitivity doubles from 3 Oct",
+      "because": "Fault ~32% of the change (largest day), heating ~43%; the fault day puts 13.8 kWh into the peak band.",
+      "plants": [
+        {
+          "kind": "heating",
+          "from": "2026-10-03",
+          "factor": 2
+        },
+        {
+          "kind": "fault_day",
+          "date": "2026-10-19",
+          "kwhPerSlot": 4.6,
+          "event": "One-off oven thermostat fault; oven ran all day."
+        }
+      ],
+      "real_data_causes": [],
+      "not_scored": {},
+      "passed": true,
+      "exact_matches": 8,
+      "scored": 8,
+      "decomposition": {
+        "ok": true,
+        "deltaGbp": 261.77,
+        "volumeGbp": 167.28,
+        "priceGbp": 79.36,
+        "timingGbp": 15.13,
+        "standingGbp": 0,
+        "identityErrorPence": 0,
+        "compensatedErrorPence": 3.637978807091713e-12,
+        "identityOk": true,
+        "slotsKept": 1344,
+        "slotsExpected": 1344,
+        "trueDeltaGbp": 261.77
+      },
+      "truth_shares": {
+        "weather": 0.4191,
+        "operational": 0,
+        "timing": 0.0578,
+        "largest_day": 0.3502,
+        "largest_day_date": "2026-10-19"
+      },
+      "hypotheses": [
+        {
+          "id": "H3",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "weather share of change",
+            "value": 0.5899,
+            "threshold": ">= 10.0% and beta t >= 2",
+            "text": "weather = 59.0% of the change (rule >= 10.0%), beta t = 5.3 (rule >= 2)"
+          },
+          "headline": "beta 13.64 kWh/HDD (t 5.3, r2 0.5), sum HDD 0.6 -> 44.9: weather +£154.43 = 59% of change"
+        },
+        {
+          "id": "H4",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "operational share of change",
+            "value": 0.0491,
+            "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+            "text": "V_op = 4.9% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none"
+          },
+          "headline": "V_op +£12.85 = 5% of change; events with a daily-kWh step: none of 1"
+        },
+        {
+          "id": "H5",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "timing share of change",
+            "value": 0.0578,
+            "threshold": ">= 10.0%",
+            "text": "T = 5.8% of the change (rule >= 10.0%)"
+          },
+          "headline": "T +£15.13 = 6% of change; peak-band kWh share +0.4 pp; largest band move morning -2.1 pp"
+        },
+        {
+          "id": "H6",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "largest-day share of change",
+            "value": 0.3502,
+            "threshold": ">= 25.0%; ruled out below 12.5%",
+            "text": "top day 2026-10-19 = 35.0% of the change (rule >= 25.0%; ruled out below 12.5%)"
+          },
+          "headline": "top day 2026-10-19 = 35% of change (+£91.67); usage on 2026-10-19 (window B) is 4.8 sd above its window mean"
+        },
+        {
+          "id": "H7",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "faults found",
+            "value": 0,
+            "threshold": ">= 1 (zero run >= 4, flatline >= 12, short day)",
+            "text": "0 zero run(s), 0 flatline(s), 0 duplicate ts, 0 short day(s)"
+          },
+          "headline": "no zero runs, flatlines, duplicate timestamps or short days in 1 site(s)"
+        },
+        {
+          "id": "H8",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "standing charge A -> B",
+            "value": "37.6525 -> 37.6525",
+            "threshold": "any change of product, tariff or standing charge",
+            "text": "standing 37.6525 -> 37.6525 p/day, product AGILE-24-10-01 -> AGILE-24-10-01"
+          },
+          "headline": "unchanged: AGILE-24-10-01, standing 37.6525 p/day in both windows; standing-charge effect S = +£0.00"
+        },
+        {
+          "id": "H9",
+          "scored": true,
+          "expected": "ruled_out",
+          "got": "ruled_out",
+          "outcome": "tn",
+          "planted_cause": false,
+          "statistic": {
+            "name": "site-windows with a gap",
+            "value": 0,
+            "threshold": ">= 1 (rows != 1344)",
+            "text": "0 of 2 site-windows incomplete"
+          },
+          "headline": "complete: 2 site-window(s) all have 1344 priced half-hours"
+        },
+        {
+          "id": "H11",
+          "scored": true,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "tp",
+          "planted_cause": true,
+          "statistic": {
+            "name": "largest |z| of a site-day",
+            "value": 6.83,
+            "threshold": ">= 4",
+            "text": "largest |z| 6.8 (rule >= 4), 1 flagged"
+          },
+          "headline": "1 unusual site-day(s); largest S1 2026-10-19: 371.6 kWh vs 151.9 expected (z 6.8); ops_log E1 \"SAMPLE: One-off oven thermostat fault; oven ran all day.\""
+        },
+        {
+          "id": "H1",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "L share of change",
+            "value": 0.3032,
+            "threshold": ">= 20.0%",
+            "text": "L = 30.3% of the change (rule: supported at >= 20.0%)"
+          },
+          "headline": "L +£79.36 = 30% of change +£261.77; avg price on A shape 25.54 -> 27.67 p/kWh"
+        },
+        {
+          "id": "H2",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "corr(price, wind) in B",
+            "value": -0.336,
+            "threshold": "<= -0.3 with gas >= +3 pp or wind <= -3 pp",
+            "text": "corr -0.34, gas 4.2 pp, wind -3.1 pp"
+          },
+          "headline": "wind -3.1 pp, gas +4.2 pp, imports -0.9 pp; corr(price, wind) in B = -0.34"
+        },
+        {
+          "id": "H10",
+          "scored": false,
+          "expected": "supported",
+          "got": "supported",
+          "outcome": "same_as_reference",
+          "planted_cause": false,
+          "statistic": {
+            "name": "emissions change",
+            "value": 165.537,
+            "threshold": "a component >= 20.0%",
+            "text": "emissions 165.5 kgCO2e"
+          },
+          "headline": "emissions 378.1 -> 543.7 kgCO2e (+165.5): volume 80.9 (49%), intensity level 87.9 (53%), timing -3.3 (2%) kg"
+        }
+      ],
+      "identification": [
+        {
+          "scenario": 12,
+          "cause": "heating sensitivity x2 from 2026-10-03",
+          "found": null,
+          "detail": "H3 weather volume estimate £154.43 vs true £109.70 (ratio 1.41)"
+        },
+        {
+          "scenario": 12,
+          "cause": "one-off fault day 2026-10-19",
+          "found": true,
+          "detail": "H11 flagged days: 2026-10-19"
+        },
+        {
+          "scenario": 12,
+          "cause": "one-off fault day 2026-10-19 as H6's day",
+          "found": true,
+          "detail": "H6 largest day 2026-10-19"
+        }
+      ],
+      "recommendation": {
+        "ok": true,
+        "shiftedKwh": 10,
+        "savedGbp": 2.55,
+        "daysShifted": 1,
+        "found": true,
+        "expectedFound": true,
+        "match": true,
+        "text": "Move the peak-band (16:00-19:00) load above the night baseline (up to 10 kWh/day per site; 10 kWh in total over 27 days) into the cheapest 3-hour block of the same day (typically 00:00-03:00): saves £2.55 and 0.90 kgCO2e on window-B prices (SAMPLE meter data)."
+      }
+    }
+  ],
+  "misses": [
+    {
+      "scenario": 1,
+      "hypothesis": "H4",
+      "expected": "ruled_out",
+      "got": "inconclusive",
+      "outcome": "tn_hedged",
+      "measured": "V_op = 9.3% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none",
+      "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+      "value": 0.0932
+    },
+    {
+      "scenario": 2,
+      "hypothesis": "H4",
+      "expected": "ruled_out",
+      "got": "inconclusive",
+      "outcome": "tn_hedged",
+      "measured": "V_op = 13.1% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none",
+      "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+      "value": 0.1306
+    },
+    {
+      "scenario": 4,
+      "hypothesis": "H4",
+      "expected": "ruled_out",
+      "got": "inconclusive",
+      "outcome": "tn_hedged",
+      "measured": "V_op = 5.3% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: E1",
+      "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+      "value": 0.0527
+    },
+    {
+      "scenario": 5,
+      "hypothesis": "H3",
+      "expected": "supported",
+      "got": "inconclusive",
+      "outcome": "fn_hedged",
+      "measured": "weather = 66.1% of the change (rule >= 10.0%), beta t = 1.0 (rule >= 2)",
+      "threshold": ">= 10.0% and beta t >= 2",
+      "value": 0.6609
+    },
+    {
+      "scenario": 5,
+      "hypothesis": "H4",
+      "expected": "ruled_out",
+      "got": "inconclusive",
+      "outcome": "tn_hedged",
+      "measured": "V_op = 72.1% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none",
+      "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+      "value": 0.7213
+    },
+    {
+      "scenario": 8,
+      "hypothesis": "H4",
+      "expected": "ruled_out",
+      "got": "inconclusive",
+      "outcome": "tn_hedged",
+      "measured": "V_op = 10.1% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none",
+      "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+      "value": 0.1007
+    },
+    {
+      "scenario": 9,
+      "hypothesis": "H4",
+      "expected": "ruled_out",
+      "got": "inconclusive",
+      "outcome": "tn_hedged",
+      "measured": "V_op = 9.0% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: none",
+      "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+      "value": 0.0903
+    },
+    {
+      "scenario": 10,
+      "hypothesis": "H4",
+      "expected": "supported",
+      "got": "inconclusive",
+      "outcome": "fn_hedged",
+      "measured": "V_op = 6.5% of the change (rule >= 10.0% and an event step; ruled out below 5.0%), events with a step: E1",
+      "threshold": ">= 10.0% with an event step (abs t >= 2); ruled out below 5.0%",
+      "value": 0.0645
+    }
+  ],
+  "bugs_fixed": []
+}
