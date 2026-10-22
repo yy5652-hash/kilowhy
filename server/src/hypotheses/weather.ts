@@ -36,6 +36,8 @@ export interface WeatherModel {
   gamma: number;                    // window-B shift in kWh/day after weather and weekday
   sigma: number;                    // residual standard deviation, kWh/day
   residualByDate: Map<string, number>;
+  /** per day: in-sample residual, standardised residual z = e / (sigma sqrt(1-h)), and the leave-one-out prediction of that day's kWh (kwh - e/(1-h)); null where leverage is ~1 */
+  diagnostics: Map<string, { residual: number; z: number; expectedLoo: number; excessLoo: number } | null>;
   sumHddA: number; sumHddB: number;
   /** daily kWh with the weather and weekday terms removed (the window shift is left in) */
   adjust(p: { date: string; kwh: number; hdd: number }): number;
@@ -59,6 +61,10 @@ export function fitWeather(points: DayPoint[]): WeatherFit {
     model: {
       fit: f, beta: hdd.beta, se: hdd.se, t: hdd.t, r2: f.r2, n: f.n, gamma: has("win_B") ? f.get("win_B").beta : 0, sigma: Math.sqrt(f.sigma2),
       residualByDate: new Map(points.map((p, i) => [p.date, f.residuals[i]])),
+      diagnostics: new Map(points.map((p, i) => {
+        const e = f.residuals[i], h = f.leverage[i];
+        return [p.date, 1 - h > 1e-6 ? { residual: e, z: e / (Math.sqrt(f.sigma2) * Math.sqrt(1 - h)), expectedLoo: p.kwh - e / (1 - h), excessLoo: e / (1 - h) } : null];
+      })),
       sumHddA: sum(points.filter((p) => p.win === "A").map((p) => p.hdd)), sumHddB: sum(points.filter((p) => p.win === "B").map((p) => p.hdd)),
       adjust: (p) => p.kwh - hdd.beta * p.hdd - wdEffect(p.date),
     },

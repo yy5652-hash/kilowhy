@@ -20,6 +20,10 @@ describe("ols: simple regression against hand-computed values", () => {
     near(f.get("x").se, Math.sqrt(1.2 / 10)); near(f.get("x").t, 0.8 / Math.sqrt(0.12));
     near(f.get("intercept").se, Math.sqrt(1.2 * (1 / 5 + 9 / 10)));
   });
+  it("leverage h_i = 1/n + (x_i - mean)^2 / Sxx, and the leverages sum to the number of coefficients", () => {
+    f.leverage.forEach((h, i) => near(h, 1 / 5 + ((i + 1 - 3) ** 2) / 10));
+    near(f.leverage.reduce((s, h) => s + h, 0), 2);
+  });
   it("r2, rss, df, sigma2, residuals", () => {
     near(f.r2, 0.64); near(f.rss, 3.6); assert.equal(f.df, 3); assert.equal(f.n, 5); assert.equal(f.k, 2); near(f.sigma2, 1.2);
     f.residuals.forEach((e, i) => near(e, [-0.4, 0.8, -1.0, 1.2, -0.6][i]));
@@ -45,6 +49,10 @@ describe("ols: multiple regression", () => {
     // standard errors from the adjugate: var(b_j) = sigma2 * cofactor_jj / det
     const cof = (r: number, c: number) => { const m = [0, 1, 2].filter((i) => i !== r).map((i) => [0, 1, 2].filter((j) => j !== c).map((j) => A[i][j])); return m[0][0] * m[1][1] - m[0][1] * m[1][0]; };
     [["intercept", 0], ["x1", 1], ["x2", 2]].forEach(([name, j]) => near(f.get(name as string).se, Math.sqrt(f.sigma2 * cof(j as number, j as number) / d), 1e-8));
+  });
+  it("leverages sum to k (3) and lie in (0, 1)", () => {
+    near(f.leverage.reduce((s, h) => s + h, 0), 3, 1e-9);
+    assert.ok(f.leverage.every((h) => h > 0 && h < 1));
   });
   it("residuals are orthogonal to every predictor and sum to zero", () => {
     near(f.residuals.reduce((s, e) => s + e, 0), 0, 1e-9);

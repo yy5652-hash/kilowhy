@@ -14,6 +14,7 @@ import { decideH7 } from "./h7_meter_fault.ts";
 import { decideH8 } from "./h8_tariff_change.ts";
 import { decideH9, coverageGaps } from "./h9_data_gap.ts";
 import { decideH10 } from "./h10_carbon.ts";
+import { decideH11, scanAnomalies } from "./h11_usage_anomaly_day.ts";
 import { synth, ctxFor, sameTemp, DEFAULT_CONTRACT } from "./testkit.ts";
 import type { ContractRow, OpsEvent } from "../data.ts";
 import type { HypCtx, HypothesisId, HypothesisResult } from "./types.ts";
@@ -28,20 +29,21 @@ describe("thresholds are the spec constants", () => {
   it("values", () => {
     assert.deepEqual([T.H1_SHARE, T.H2_GAS_PP, T.H2_WIND_PP, T.H2_CORR, T.H3_T, T.H3_SHARE, T.H4_SHARE, T.H4_T, T.H5_SHARE, T.H6_SHARE, T.H7_ZERO_RUN_SLOTS, T.H7_FLATLINE_SLOTS, T.SLOTS_PER_DAY, T.HDD_BASE_C],
       [0.20, 3, 3, -0.3, 2, 0.10, 0.10, 2, 0.10, 0.25, 4, 12, 48, 15.5]);
+    assert.deepEqual([T.H11_Z, T.H5_SHIFT_PP, T.H5_EVENT_DAYS], [4, 10, 3]);
   });
 });
 
 describe("catalog and runner", () => {
-  it("lists H1..H10 with id, name, title and a one-line description", () => {
-    assert.deepEqual(CATALOG.map((c) => c.id), ["H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10"]);
+  it("lists H1..H11 with id, name, title and a one-line description", () => {
+    assert.deepEqual(CATALOG.map((c) => c.id), ["H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10", "H11"]);
     assert.deepEqual(HYPOTHESIS_IDS, CATALOG.map((c) => c.id));
     for (const c of CATALOG) { assert.ok(c.name && c.title && c.description.length > 20); assert.ok(!c.description.includes("\n")); }
-    assert.deepEqual(CATALOG.map((c) => c.name), ["price_level", "price_driver_generation", "weather_volume", "operational_change", "timing_shift", "one_off_day", "meter_fault", "tariff_change", "data_gap", "carbon"]);
+    assert.deepEqual(CATALOG.map((c) => c.name), ["price_level", "price_driver_generation", "weather_volume", "operational_change", "timing_shift", "one_off_day", "meter_fault", "tariff_change", "data_gap", "carbon", "usage_anomaly_day"]);
   });
   it("runAll returns one result per hypothesis whose evidence ids exist, with sequential E# ids and 64-hex hashes", async () => {
     const ctx = await ctxFor(synth({ sites: ["S1", "S2"] }));
     const res = await ALL(ctx);
-    assert.equal(res.length, 10);
+    assert.equal(res.length, 11);
     res.forEach(clean);
     const ids = ctx.evidence.list().map((e) => e.id);
     assert.deepEqual(ids, ids.map((_, i) => `E${i + 1}`));
@@ -368,4 +370,63 @@ describe("evidence content", () => {
     assert.equal(JSON.stringify(ctx.evidence).includes("NaN"), false);
   });
   it("sameTemp helper is the same in both windows (guards the scenario design)", () => assert.equal(sameTemp("A", 5), sameTemp("B", 5)));
+});
+
+describe("H11 usage_anomaly_day", () => {
+  it("decision: any flagged site-day -> supported; none and all sites modelled -> ruled out; a site that could not be modelled -> inconclusive", () => {
+    const d = (flagged: number, failedSites: string[], siteDays = 56) => decideH11({ flagged: Array(flagged).fill({}) as any, failedSites, siteDays });
+    assert.equal(d(1, []), "supported"); assert.equal(d(1, ["S2"]), "supported");
+    assert.equal(d(0, []), "ruled_out"); assert.equal(d(0, ["S2"]), "inconclusive"); assert.equal(d(0, [], 0), "inconclusive");
+  });
+  const mkPoints = (spike: Record<string, number> = {}): DayPoint[] =>
+    Array.from({ length: 56 }, (_, i) => {
+      const date = addDays("2026-08-27", i), hdd = (i * 7) % 5 + (i >= 28 ? 1 : 0);
+      return { date, win: i < 28 ? "A" as const : "B" as const, hdd, kwh: 100 + 4 * hdd + ((i * 13) % 7) * 0.3 - ((i * 5) % 3) * 0.2 + (spike[date] ?? 0) };
+    });
+  it("scanAnomalies: flags a +30 kWh day (z well above 4), gives kWh vs expected, and cites the ops_log event of that site and date only", () => {
+    const events: OpsEvent[] = [{ eventId: "E2", siteId: "S3", eventDate: "2026-09-20", description: "freezer fault" }, { eventId: "E9", siteId: "S3", eventDate: "2026-09-21", description: "other day" }, { eventId: "E8", siteId: "S1", eventDate: "2026-09-20", description: "other site" }];
+    const scan = scanAnomalies([{ site: "S3", points: mkPoints({ "2026-09-20": 30 }) }], events);
+    assert.equal(scan.flagged.length, 1);
+    const a = scan.flagged[0];
+    assert.equal(a.date, "2026-09-20"); assert.ok(a.z > 4 && a.z < 8, String(a.z));
+    assert.ok(Math.abs(a.kwh - a.expected - 30) < 3, `kwh ${a.kwh} expected ${a.expected}`);
+    assert.deepEqual(a.event, { eventId: "E2", description: "freezer fault" });
+    assert.equal(scan.siteDays, 56); assert.equal(scan.maxAbsZ, Math.abs(a.z));
+  });
+  it("a negative spike (a day far BELOW expectation) is flagged too, and a higher z threshold flags nothing", () => {
+    const scan = scanAnomalies([{ site: "S1", points: mkPoints({ "2026-10-01": -30 }) }], []);
+    assert.equal(scan.flagged.length, 1); assert.ok(scan.flagged[0].z < -4); assert.equal(scan.flagged[0].event, null);
+    assert.equal(scanAnomalies([{ site: "S1", points: mkPoints({ "2026-10-01": -30 }) }], [], 50).flagged.length, 0);
+  });
+  it("a series with no spike is not flagged; a site whose model cannot be fitted is listed, not guessed", () => {
+    assert.equal(scanAnomalies([{ site: "S1", points: mkPoints() }], []).flagged.length, 0);
+    const flat = mkPoints().map((p) => ({ ...p, hdd: 2 }));
+    const scan = scanAnomalies([{ site: "S1", points: flat }, { site: "S2", points: mkPoints() }], []);
+    assert.deepEqual(scan.failedSites, ["S1"]); assert.equal(scan.siteDays, 56);
+  });
+  const spikeKwh = (extra: number, site = "S1", day = 10) => (s: string, w: "A" | "B", d: number, slot: number, date: string) =>
+    0.6 + (slot >= 6 && slot < 18 ? 1.2 : 0) + (new Date(date + "T00:00:00Z").getUTCDay() === 0 ? -0.2 : 0) + (s === site && w === "B" && d === day ? extra : 0);
+  it("pipeline: a spike day with an ops_log event is supported and the evidence cites the day, kWh vs expected, z and the event text", async () => {
+    const date = addDays("2026-09-24", 10);
+    const ops: OpsEvent[] = [{ eventId: "E5", siteId: "S1", eventDate: date, description: "SAMPLE: walk-in freezer fault" }];
+    const ctx = await ctxFor(synth({ kwh: spikeKwh(0.8), ops }));
+    const h11 = R(await ALL(ctx), "H11");
+    clean(h11);
+    assert.equal(h11.status, "supported");
+    assert.equal(h11.summary.top_day, date); assert.equal(h11.summary.top_site, "S1");
+    assert.ok((h11.summary.top_z as number) > 4); assert.ok(Math.abs((h11.summary.top_kwh as number) - (h11.summary.top_expected_kwh as number) - 38.4) < 3);
+    assert.match(String(h11.summary.top_ops_event), /E5: SAMPLE: walk-in freezer fault/);
+    const e = ctx.evidence.get(h11.evidence[0])!;
+    assert.equal(e.metrics.anomaly_1_day.value, date); assert.match(String(e.metrics.anomaly_1_ops_event.value), /freezer/); assert.ok((e.metrics.anomaly_1_z.value as number) > 4);
+    assert.ok(h11.notes.some((n) => n.includes("freezer fault") && n.includes("expected")));
+  });
+  it("pipeline: the same spike without a logged event says so; a flat series is ruled out", async () => {
+    const h11 = R(await ALL(await ctxFor(synth({ kwh: spikeKwh(0.8) }))), "H11");
+    assert.equal(h11.status, "supported"); assert.equal(h11.summary.top_ops_event, null); assert.ok(h11.notes.some((n) => n.includes("no ops_log event on that date")));
+    assert.equal(R(await ALL(await ctxFor(synth({}))), "H11").status, "ruled_out");
+  });
+  it("pipeline: in a multi-site scope the spike is attributed to its own site", async () => {
+    const h11 = R(await ALL(await ctxFor(synth({ sites: ["S1", "S2"], kwh: spikeKwh(0.8, "S2") }))), "H11");
+    assert.equal(h11.status, "supported"); assert.equal(h11.summary.top_site, "S2"); assert.equal(h11.summary.site_days_tested, 112);
+  });
 });

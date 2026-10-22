@@ -74,7 +74,7 @@ export const H6: Hypothesis = {
     // informational: the most unusual day by weather- and weekday-adjusted daily kWh (does not depend on the cost-share rule or on which window the day is in)
     const wfit = fitWeather(dailyPoints(daily.rows, ctx.sites, ctx.windowA, ctx.windowB).points);
     let anomaly: { date: string; excessKwh: number; z: number } | null = null;
-    if (wfit.ok && wfit.model.sigma > 1e-9) for (const [date, e] of wfit.model.residualByDate) if (!anomaly || Math.abs(e) > Math.abs(anomaly.excessKwh)) anomaly = { date, excessKwh: e, z: e / wfit.model.sigma };
+    if (wfit.ok && wfit.model.sigma > 1e-9) for (const [date, dg] of wfit.model.diagnostics) if (dg && (!anomaly || Math.abs(dg.z) > Math.abs(anomaly.z))) anomaly = { date, excessKwh: dg.excessLoo, z: dg.z };
     const driverText = (x: ReturnType<typeof describe>) => (x?.driver ? `${x.driver.label} is ${round(Math.abs(x.driver.z), 1)} sd ${x.driver.z > 0 ? "above" : "below"} its window mean` : "no standout driver");
     const m: Record<string, [number | string | boolean | null, string]> = {
       top_day_share: [top.share, "ratio"], top_day_delta: [gbp(top.deltaPence), "GBP"], total_change: [gbp(top.totalPence), "GBP"], top_day: [top.date, "date"],

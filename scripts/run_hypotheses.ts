@@ -44,7 +44,7 @@ for (const [label, { ctx, results, rec }] of runs) {
       check(`${label} L matches eval/decompose_d2.json`, Math.abs(gbp(r.price) - prev.gbp.price) < 0.011, `${gbp(r.price)} vs ${prev.gbp.price}`);
     }
   }
-  check(`${label} 10 hypotheses ran`, results.length === 10 && CATALOG.every((c) => results.some((x) => x.id === c.id)));
+  check(`${label} all ${CATALOG.length} hypotheses ran`, results.length === CATALOG.length && CATALOG.every((c) => results.some((x) => x.id === c.id)));
   check(`${label} no hypothesis errored`, results.every((x) => x.summary.error === undefined), results.filter((x) => x.summary.error !== undefined).map((x) => `${x.id}: ${x.summary.error}`).join("; "));
   check(`${label} every cited evidence id exists`, results.every((x) => x.evidence.every((id) => ctx.evidence.get(id))));
   check(`${label} evidence hashes are sha256`, ctx.evidence.list().every((e) => /^[0-9a-f]{64}$/.test(e.resultSha256) && e.zetarisRunId.length > 0));
@@ -61,6 +61,9 @@ for (const ev of siteIds.flatMap(opsFor)) {
   const h4 = ev;                                         // EventTest from H4 of the event's own site scope
   const h6 = runs.get(ev.siteId)!.results.find((x) => x.id === "H6")!;
   const h5 = runs.get(ev.siteId)!.results.find((x) => x.id === "H5")!;
+  const h11 = runs.get(ev.siteId)!.results.find((x) => x.id === "H11")!;
+  const flagged = ((h11.details?.flagged as any[]) ?? []).filter((a) => a.site === ev.siteId);
+  const shift = ((h5.details?.scheduleCandidates as any[]) ?? []).find((x) => x.site === ev.siteId) ?? null;
   const inA = ev.date >= WINDOW_A.from && ev.date < WINDOW_A.toExclusive;
   const partner = inA ? dayShift(ev.date, WINDOW_B.days) : dayShift(ev.date, -WINDOW_A.days); // the aligned day in the other window
   const dates = new Set([ev.date, partner]);
@@ -72,6 +75,8 @@ for (const ev of siteIds.flatMap(opsFor)) {
     h6_top_day_is_event_day: near(h6.summary.top_day), h6_opposite_day_is_event_day: near(h6.summary.opposite_day), h6_status_for_site: h6.status,
     h6_most_unusual_day: h6.summary.anomalous_day, h6_most_unusual_day_z: h6.summary.anomalous_day_z, h6_most_unusual_day_is_event_day: h6.summary.anomalous_day === ev.date,
     h5_status_for_site: h5.status, h5_T_share_of_delta: h5.summary.T_share_of_delta,
+    h5_schedule_shift: shift ? { detected: shift.detected, band: shift.band, delta_pp: shift.deltaPp, change_point: shift.changePoint, nearest_event: shift.nearestEvent?.eventId ?? null, near_this_event: shift.nearestEvent?.eventId === ev.eventId } : null,
+    h11_flagged_on_event_day: flagged.some((a) => a.date === ev.date), h11_status_for_site: h11.status, h11_max_abs_z: h11.summary.max_abs_z,
   });
 }
 
@@ -113,12 +118,13 @@ function short(r: HypothesisResult): string {
     case "H2": return `corr ${sg(s.corr_price_wind_B)}`;
     case "H3": return `Vw ${sg(s.v_weather_gbp)} ${pc(s.v_weather_share)}`;
     case "H4": return `Vop ${sg(s.v_operational_gbp)} ${pc(s.v_operational_share)} ${s.steps}`;
-    case "H5": return `T ${sg(s.T_gbp)} ${pc(s.T_share_of_delta)}`;
+    case "H5": return `T ${sg(s.T_gbp)} ${pc(s.T_share_of_delta)}${s.schedule_shift_detected ? " +shift" : ""}`;
     case "H6": return `${String(s.top_day).slice(5)} ${pc(s.top_day_share)}`;
     case "H7": return `${(s.zero_runs as number) + (s.flatlines as number) + (s.duplicate_timestamps as number) + (s.days_not_48_slots as number)} faults`;
     case "H8": return `S ${sg(s.standing_effect_gbp)}`;
     case "H9": return `${s.site_windows_with_gap} gaps`;
     case "H10": return `${sg(s.delta_kg, 1)} kg`;
+    case "H11": return s.n_flagged ? `${s.top_site} ${String(s.top_day).slice(5)} z${sg(s.top_z, 1)}` : `max z ${s.max_abs_z}`;
   }
 }
 const labels = [...runs.keys()];
@@ -133,7 +139,7 @@ console.log("\nRecommendation (counterfactual on window-B prices):");
 for (const [l, { rec }] of runs) console.log(`  ${l}: ${rec.text}`);
 console.log("\nPlanted sample events (reported as found, thresholds untouched):");
 for (const p of planted) {
-  console.log(`  ${p.event}: H4 step ${p.h4_step_detected ? "DETECTED" : "not detected"} (adjusted t ${p.h4_t_adjusted === null ? "n/a" : p.h4_t_adjusted.toFixed(2)}, raw t ${p.h4_t_raw === null ? "n/a" : p.h4_t_raw.toFixed(2)}, ${p.h4_step_kwh_per_day === null ? "n/a" : p.h4_step_kwh_per_day.toFixed(2)} kWh/day); H4 status ${p.h4_status_for_site}; H6 top day ${p.h6_top_day_is_event_day ? "IS" : "is not"} the event day, status ${p.h6_status_for_site}; most unusual day ${p.h6_most_unusual_day} (z ${p.h6_most_unusual_day_z})${p.h6_most_unusual_day_is_event_day ? " = event day" : ""}; H5 ${p.h5_status_for_site}${p.h4_profile_shift ? `; intraday ${p.h4_profile_shift.band} share ${p.h4_profile_shift.pp.toFixed(1)} pp` : ""}`);
+  console.log(`  ${p.event}: H4 step ${p.h4_step_detected ? "DETECTED" : "not detected"} (adjusted t ${p.h4_t_adjusted === null ? "n/a" : p.h4_t_adjusted.toFixed(2)}, raw t ${p.h4_t_raw === null ? "n/a" : p.h4_t_raw.toFixed(2)}, ${p.h4_step_kwh_per_day === null ? "n/a" : p.h4_step_kwh_per_day.toFixed(2)} kWh/day); H4 status ${p.h4_status_for_site}; H6 top day ${p.h6_top_day_is_event_day ? "IS" : "is not"} the event day, status ${p.h6_status_for_site}; most unusual day ${p.h6_most_unusual_day} (z ${p.h6_most_unusual_day_z})${p.h6_most_unusual_day_is_event_day ? " = event day" : ""}; H5 ${p.h5_status_for_site}${p.h5_schedule_shift ? ` (${p.h5_schedule_shift.detected ? "schedule shift" : "sub-threshold schedule move"} ${p.h5_schedule_shift.band} ${p.h5_schedule_shift.delta_pp.toFixed(1)} pp from ${p.h5_schedule_shift.change_point}, ${p.h5_schedule_shift.near_this_event ? "matches this event" : "nearest event " + p.h5_schedule_shift.nearest_event})` : ""}; H11 ${p.h11_status_for_site} (max |z| ${p.h11_max_abs_z}${p.h11_flagged_on_event_day ? ", flagged on the event day" : ""})${p.h4_profile_shift ? `; intraday ${p.h4_profile_shift.band} share ${p.h4_profile_shift.pp.toFixed(1)} pp` : ""}`);
 }
 console.log(`\n${checks.length} checks, ${checks.filter((c) => !c.pass).length} failed. Wrote eval/hypotheses_d2.json (${scopeOut.reduce((n, s) => n + s.evidence.length, 0)} evidence records).`);
 console.log(pass ? "HYPOTHESES PASS" : "HYPOTHESES FAIL");

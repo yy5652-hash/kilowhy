@@ -5,7 +5,7 @@ import type { EvidenceStore, MetricValue } from "../evidence.ts";
 import type { DateWindow } from "../windows.ts";
 
 export type Status = "supported" | "ruled_out" | "inconclusive";
-export type HypothesisId = "H1" | "H2" | "H3" | "H4" | "H5" | "H6" | "H7" | "H8" | "H9" | "H10";
+export type HypothesisId = "H1" | "H2" | "H3" | "H4" | "H5" | "H6" | "H7" | "H8" | "H9" | "H10" | "H11";
 export type SummaryValue = MetricValue["value"];
 
 export interface HypothesisResult {

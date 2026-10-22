@@ -27,6 +27,13 @@ export const THRESHOLDS = {
   SLOTS_PER_DAY: 48,
   // H10 carbon: per component, like H1
   H10_SHARE: 0.20,
+  // H11 usage_anomaly_day: a site-day whose weather- and weekday-adjusted daily kWh is >= 4 residual standard deviations from the model
+  H11_Z: 4,
+  // H5 schedule shift (extra metric, does not change the cost-based status): a band's kWh share moves >= 10 pp between the windows;
+  // change point = split of the site's daily band-share series with the largest mean difference (each segment >= 5 days); event matched within +-3 days
+  H5_SHIFT_PP: 10,
+  H5_SEGMENT_MIN_DAYS: 5,
+  H5_EVENT_DAYS: 3,
 
   NEAR_MISS_FRACTION: 0.5,
 

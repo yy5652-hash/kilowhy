@@ -11,6 +11,7 @@ export interface OlsFit {
   r2: number;                            // 0 when y is constant
   rss: number; sigma2: number;           // residual sum of squares and RSS / df
   residuals: number[];
+  leverage: number[];                    // hat-matrix diagonal h_ii (sums to k)
   get(name: string): OlsCoef;
 }
 export interface OlsErr { ok: false; error: "shape_mismatch" | "non_finite_input" | "too_few_observations" | "singular"; message: string }
@@ -64,6 +65,7 @@ export function ols(y: number[], X: number[][], names: string[]): OlsFit | OlsEr
   const b = bz.map((v, j) => v / scale[j]);
   const intercept = my - sum(b.map((v, j) => v * mx[j]));
   const residuals = y.map((v, i) => v - intercept - sum(b.map((bj, j) => bj * X[i][j])));
+  const leverage = Z.map((r) => 1 / n + sum(r.map((za, a) => za * sum(r.map((zb, b) => Ginv[a][b] * zb)))));
   const rss = sum(residuals.map((e) => e * e));
   const tss = sum(yc.map((e) => e * e));
   const df = n - k;
@@ -75,7 +77,7 @@ export function ols(y: number[], X: number[][], names: string[]): OlsFit | OlsEr
   const mk = (name: string, beta: number, se: number): OlsCoef => ({ name, beta, se, t: se > 0 ? beta / se : beta === 0 ? 0 : beta > 0 ? Infinity : -Infinity });
   const coef = [mk("intercept", intercept, seOf(sigma2 * (1 / n + quad))), ...names.map((nm, j) => mk(nm, b[j], seOf(sigma2 * V[j][j])))];
   return {
-    ok: true, n, k, df, coef, r2: tss > 0 ? 1 - rss / tss : 0, rss, sigma2, residuals,
+    ok: true, n, k, df, coef, r2: tss > 0 ? 1 - rss / tss : 0, rss, sigma2, residuals, leverage,
     get(name: string) { const c = coef.find((x) => x.name === name); if (!c) throw new Error(`no coefficient "${name}"`); return c; },
   };
 }

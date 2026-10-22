@@ -11,8 +11,9 @@ import { H7 } from "./h7_meter_fault.ts";
 import { H8 } from "./h8_tariff_change.ts";
 import { H9 } from "./h9_data_gap.ts";
 import { H10 } from "./h10_carbon.ts";
+import { H11 } from "./h11_usage_anomaly_day.ts";
 
-export const HYPOTHESES: readonly Hypothesis[] = [H1, H2, H3, H4, H5, H6, H7, H8, H9, H10];
+export const HYPOTHESES: readonly Hypothesis[] = [H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11];
 export const CATALOG: readonly { id: HypothesisId; name: string; title: string; description: string }[] = HYPOTHESES.map((h) => ({ id: h.id, name: h.name, title: h.title, description: h.description }));
 export const HYPOTHESIS_IDS: readonly HypothesisId[] = HYPOTHESES.map((h) => h.id);
 
