@@ -142,7 +142,8 @@ function h10h11(t: FactTable, i: FactsInput, has: (id: HypothesisId) => Hypothes
       const k = n + 1, e = ref(i.evidence, "H11", `anomaly_${k}_z`)?.evidence;
       const name = i.siteNames[a.site] ? `${a.site} (${i.siteNames[a.site]})` : a.site;
       t.add(`spike_${k}_site`, `Unusual day ${k}: site`, name, "text", e, "H11");
-      t.add(`spike_${k}_day`, `Unusual day ${k}: date`, a.date, "date", e, "H11");
+      t.add(`spike_${k}_day`, `Unusual day ${k}: date (it falls in ${a.win === "A" ? "window A, the baseline, so it raised the baseline and did not add to the change" : "window B, the latest four weeks"})`, a.date, "date", e, "H11");
+      t.add(`spike_${k}_window`, `Unusual day ${k}: which window it falls in`, a.win === "A" ? "window A (the baseline)" : "window B (the latest four weeks)", "text", e, "H11");
       t.add(`spike_${k}_kwh`, `Unusual day ${k}: electricity used`, a.kwh, "kWh", e, "H11");
       t.add(`spike_${k}_expected_kwh`, `Unusual day ${k}: electricity expected from weather and weekday`, a.expected, "kWh", e, "H11");
       t.add(`spike_${k}_z`, `Unusual day ${k}: distance from expected, in standard deviations (4 or more is flagged)`, a.z, "sd", e, "H11");

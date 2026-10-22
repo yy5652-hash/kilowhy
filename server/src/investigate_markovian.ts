@@ -21,10 +21,12 @@ import type { Emit } from "./agent_events.ts";
 
 export const CHAIN_CONFIG = { chunkSize: 4000, maxChunks: 16, carryoverTokens: 800, overlapTokens: 0 } as const;   // carryover 800 tokens = 3,200 characters of JSON
 // The spec asks for batches of 3. Measured on the live stack (scripts/markovian_latency.ts, eval/latency/markovian_d3.json, 5 runs per setting): an interpret call takes 6-12 s through
-// Nightshift (the labelled NVIDIA call joins after 8 s), so batches of 3 (three chunks) cost 19-31 s per question, mean 25 s, and on cold first runs the chain finished about 40 s after the
+// Nightshift (the labelled NVIDIA call then joined after 8 s; since D5b it joins after 20 s), so batches of 3 (three chunks) cost 19-31 s per question, mean 25 s, and on cold first runs the chain finished about 40 s after the
 // plain loop. Batches of 5 (two chunks) cost 20-28 s, mean 23 s, about 25 s after the plain loop. The default is therefore the coarser 5; batchSize 3 stays an option (markovian.batchSize).
 export const BATCH_SIZE = 5;
-export const INTERPRET_DEADLINE_MS = 20_000, INTERPRET_HEDGE_MS = 8_000;   // an interpret chunk is an enrichment: after 8 s the labelled NVIDIA call joins, after 20 s the chunk goes on without its readings
+// An interpret chunk is an enrichment, so the chunk goes on without its readings after the deadline. Nightshift is the primary provider (hackathon Power rule): it gets a real head start,
+// and only after the hedge delay does the labelled NVIDIA call join it.
+export const INTERPRET_DEADLINE_MS = 40_000, INTERPRET_HEDGE_MS = 20_000;
 
 export interface ChainArgs {
   env: LlmEnv;
@@ -117,7 +119,7 @@ export async function runMarkovianChain(a: ChainArgs): Promise<ChainResult> {
       const attempt = s.att + 1, label = attempt === 1 ? "narrative" : `narrative (correction ${attempt - 1})`;
       if (attempt === 1) narrativeStart = performance.now();
       const tape: Tape = [], stateText = serialize(s);
-      const input: NarrativeInput = { question: a.question, type: a.type, scopeText: a.scopeText, facts: chunkFacts(a.facts, a.hyps, a.emphasis, a.type, s), hypotheses: a.hyps.filter((h) => !offHypotheses(a.type).includes(h.id)), titles: a.titles, focusDates: a.focusDates, hasRecommendation: a.hasRecommendation };
+      const input: NarrativeInput = { question: a.question, type: a.type, scopeText: a.scopeText, facts: chunkFacts(a.facts, a.hyps, a.emphasis, a.type, s), hypotheses: a.hyps.filter((h) => !offHypotheses(a.type).includes(h.id)), titles: a.titles, focusDates: a.focusDates, hasRecommendation: a.hasRecommendation, quality: a.vctx.quality };
       const base = narrativeChunkMessages(input, stateText);
       const previous = draft ? (draft.value ? JSON.stringify(draft.value) : draft.rawText ?? "") : "";
       const messages = attempt === 1 ? base : [...base, { role: "assistant" as const, content: previous.slice(0, 3000) }, { role: "user" as const, content: correctiveMessage(out.lastErrors) }];
@@ -157,7 +159,7 @@ export async function runMarkovianChain(a: ChainArgs): Promise<ChainResult> {
   if (run.status !== "completed") notes.push(`the chain ended with status ${run.status}${run.error ? `: ${run.error}` : ""}`);
   const emphasisFacts = relevantFacts(a.facts, a.hyps, a.emphasis, a.type);
   const plainPrompt = messageTokens(planMessages({ question: a.question, memories: a.planMemories })) +
-    messageTokens(narrativeMessages({ question: a.question, type: a.type, scopeText: a.scopeText, facts: emphasisFacts, hypotheses: a.hyps.filter((h) => !offHypotheses(a.type).includes(h.id)), titles: a.titles, focusDates: a.focusDates, hasRecommendation: a.hasRecommendation }));
+    messageTokens(narrativeMessages({ question: a.question, type: a.type, scopeText: a.scopeText, facts: emphasisFacts, hypotheses: a.hyps.filter((h) => !offHypotheses(a.type).includes(h.id)), titles: a.titles, focusDates: a.focusDates, hasRecommendation: a.hasRecommendation, quality: a.vctx.quality }));
   const chunks = withNaive(logs);
   const ref = { totalTokensUsed: run.totalTokensUsed, tokensSaved: run.totalTokensSaved, efficiencyPercent: Math.round(run.efficiencyPercent * 10) / 10, label: "the engine's own run accounting: tokens of the chunks' display text (estimated, chars/4) against its configured carryover" };
   return {

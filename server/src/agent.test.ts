@@ -33,9 +33,9 @@ describe("investigate: a verified LLM answer", () => {
     const o = ok(await run(Q, happy()));
     const s0 = o.answer.sentences[0];
     const get = (k: string) => o.facts.find((f) => f.key === k)!;
-    assert.equal(s0.text, `Your bill rose by ${get("delta_bill").display} (${get("delta_bill_pct").display}), from ${get("bill_A").display} to ${get("bill_B").display}.`);
-    assert.deepEqual(s0.facts, [get("delta_bill").id, get("delta_bill_pct").id, get("bill_A").id, get("bill_B").id].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))));
-    assert.deepEqual(s0.evidence, ["E1"]);
+    assert.equal(s0.text, `Your bill rose by ${get("delta_bill").display} (${get("delta_bill_pct").display}), from ${get("bill_A").display} to ${get("bill_B").display}, mostly because of colder weather (${get("v_weather").display}).`);
+    assert.deepEqual(s0.facts, [get("delta_bill").id, get("delta_bill_pct").id, get("bill_A").id, get("bill_B").id, get("v_weather").id].sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))));
+    assert.deepEqual(s0.evidence, ["E1", get("v_weather").evidence].sort());
     for (const t of [o.answer.headline, ...o.answer.sentences.map((x) => x.text), ...o.answer.ruledOut.map((x) => x.text), o.answer.recommendation.text]) assert.ok(!/[{}]/.test(t), `no placeholder survives: ${t}`);
   });
   it("the result has every field of the spec", async () => {
@@ -343,12 +343,12 @@ describe("investigate: placeholder repairs and verification retries", () => {
     const withTime = (req: ChatRequest) => {
       const L = factLines(req), block = L.find((l) => l.label.startsWith("Load shift: cheapest same-day block"))!.display;
       const n = JSON.parse(goodNarrative(req));
-      n.recommendation.text = `Move load to ${block}; as a historical counterfactual, the flat tariff would have cost ${ph(L, "Flat tariff minus Agile in window B")} more.`;
+      n.recommendation.text = `Staying on Agile saved ${ph(L, "Flat tariff minus Agile in window B", true)} against a flat business tariff over the four weeks, a historical counterfactual; moving load to ${block} would have saved only ${ph(L, "Load shift: money saved")} and ${ph(L, "Load shift: carbon saved")}.`;
       return JSON.stringify(n);
     };
     const o = ok(await run(Q, fakeChat({ intent: [INTENT_OK()], plan: [PLAN_OK()], narrative: [withTime] })));
     assert.equal(o.verification.attempts, 1); assert.equal(o.verification.mode, "llm");
-    assert.match(o.answer.recommendation.text, /^Move load to \d\d:\d\d-\d\d:\d\d;/);
+    assert.match(o.answer.recommendation.text, /moving load to \d\d:\d\d-\d\d:\d\d would have saved only/);
     assert.ok(o.answer.recommendation.facts.includes(o.facts.find((f) => f.key === "rec_blocks")!.id));
   });
   it("a quick rate-limit error on the narrative is retried once and the answer is still verified by the model", async () => {
@@ -575,15 +575,14 @@ describe("template narrative", () => {
     assert.ok(a.sentences.length >= 1);
     assert.deepEqual(check(a), []);
   });
-  it("a ruled-out timing shift still mentions a daily-pattern move that matches a logged event", async () => {
+  it("a ruled-out timing shift still mentions a daily-pattern move that matches a logged event, in the same short clause", async () => {
     // S2 moves its evening load later from the day of the logged oven event, but prices are flat, so the cost effect T is nil
     const { o, hyps, check } = await prepare("why_cost_change", { price: () => 20, temp: () => 11, kwh: (s, w, day, slot) => (s === "S2" && w === "B" && day >= 13 ? (slot >= 20 && slot < 34 ? 2.4 : 0.6) : slot >= 12 && slot < 26 ? 1.2 : 0.6) });
     const a = templateAnswer(o.facts, hyps, "why_cost_change");
     const h5 = a.ruledOut.find((r) => r.hypothesis === "H5");
     assert.ok(h5, "H5 is ruled out");
-    assert.match(h5!.text, /The daily pattern at S2 did move: its \w+ share changed by [\d.]+ pp from 2026-10-07\./);
-    assert.match(h5!.text, /matches a logged event: SAMPLE: Oven schedule moved/);
-    assert.match(h5!.text, /did not change the bill materially\.$/);
+    assert.match(h5!.text, /^Timing is ruled out: it moved the bill by only .*, though the \w+ share at S2 moved [\d.]+ pp from 2026-10-07\.$/);
+    assert.ok(h5!.text.split(/\s+/).length <= 30 && !/[.!?]\s+[A-Z]/.test(h5!.text));
     assert.deepEqual(check(a), []);
   });
   it("an emissions answer leads with emissions and keeps cost effects out", async () => {
@@ -620,7 +619,8 @@ describe("rendering", () => {
     const o = await run(Q, happy());
     const text = renderOutcome(o);
     assert.match(text, /SAMPLE data/);
-    assert.match(text, /^1\. Your bill rose by £[\d,.]+ .* \[E1\]/m);
+    assert.match(text, /^1\. Your bill rose by £[\d,.]+[\s\S]*?\[E1\]/m);
+    assert.match(text, /\n\nYour bill rose by £[\d,.]+\n\n1\. /, "the headline is printed in sentence case, as written");
     assert.match(text, /Ruled out:\n {2}- H5: Timing is ruled out/);
     assert.match(text, /Recommendation:\n/);
     assert.match(text, /Verification: PASSED, mode llm, 1 narrative attempt\(s\)/);

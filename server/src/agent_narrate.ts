@@ -5,7 +5,7 @@ import type { Fact } from "./facts.ts";
 import type { ChatMessage } from "./provider_shared.ts";
 import { askJson, correctiveMessage, type LlmEnv } from "./agent_llm.ts";
 import { checkNarrativeShape, NARRATIVE_MAX_TOKENS } from "./agent_prompts.ts";
-import { answerFromReply, dropContradictions } from "./narration.ts";
+import { addCounterfactualFraming, answerFromReply, dropContradictions } from "./narration.ts";
 import { errorLine, verifyAnswer, type Answer, type VerifyCtx, type VerifyError } from "./verifier.ts";
 
 const TRANSIENT = /timeout|HTTP 429|HTTP 5\d\d|network error|Too Many Requests/i;
@@ -44,11 +44,13 @@ export interface CheckOutcome {
 
 /** Placeholders -> text, verifier, and the cheap repair of status contradictions. Pure. */
 export function narrateCheck(reply: NarrativeValue, facts: Fact[], vctx: VerifyCtx): CheckOutcome {
-  const n = answerFromReply(reply, facts, vctx.hypotheses, new Set(vctx.evidenceIds));
+  const n = answerFromReply(reply, facts, vctx.hypotheses, new Set(vctx.evidenceIds), vctx.quality);
   let v = n.errors.length ? { passed: false, errors: [] as VerifyError[] } : verifyAnswer(n.answer, vctx);
   let candidate = n.answer, repairs = n.repairs;
-  if (!v.passed && !n.errors.length) {
-    const fix = dropContradictions(candidate, v.errors);
+  // cheap repairs instead of a corrective round trip: leave out status contradictions, add the counterfactual clause to a tariff comparison
+  for (const fixer of [dropContradictions, addCounterfactualFraming]) {
+    if (v.passed || n.errors.length) break;
+    const fix = fixer(candidate, v.errors);
     if (fix) { const v2 = verifyAnswer(fix.answer, vctx); if (v2.passed) { v = v2; candidate = fix.answer; repairs = [...repairs, ...fix.notes]; } }
   }
   if (v.passed) return { answer: candidate, repairs, errors: [], detail: [], rejectedRepairs: [] };

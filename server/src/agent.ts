@@ -28,6 +28,7 @@ import { runExtraSql } from "./agent_extra.ts";
 import { runScope, type ScopeRun } from "./agent_run.ts";
 import { narrate, type NarrateOutcome } from "./agent_narrate.ts";
 import { templateAnswer } from "./agent_template.ts";
+import { makeChecks, qualityContext } from "./quality.ts";
 import { safeEmit, timed, type ProgressEvent } from "./agent_events.ts";
 import { DEFAULT_REASONING } from "./agent_reasoning.ts";
 import { SAMPLE_NOTE, type ClarificationResult, type DecompositionSummary, type InvestigateOutcome, type Intent, type IntentType, type InvestigationResult, type LlmCall, type Plan, type Timings, type Verification } from "./agent_types.ts";
@@ -172,7 +173,8 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   const facts = [...dataFacts, ...memFacts];
   const rank = (id: string) => plan.hypotheses.indexOf(id as HypothesisId);
   const hyps: HypInfo[] = results.map((x) => ({ id: x.id, name: x.name, status: x.status })).sort((x, y) => rank(x.id) - rank(y.id));
-  const vctx: VerifyCtx = { facts, evidenceIds: evidence.list().map((e) => e.id), hypotheses: hyps, requireRecommendation: facts.some((f) => f.hypothesis === "REC") };
+  const quality = qualityContext(facts, hyps, { type: intent.type, siteScoped: scope.siteIds.length < known.length });
+  const vctx: VerifyCtx = { facts, evidenceIds: evidence.list().map((e) => e.id), hypotheses: hyps, requireRecommendation: facts.some((f) => f.hypothesis === "REC"), quality, checks: [makeChecks(quality, facts)] };
 
   // ---- 6 + verify: placeholder narrative with up to 2 corrective retries, else the template
   const titles = Object.fromEntries(CATALOG.map((c) => [c.id as string, c.title]));
@@ -188,7 +190,7 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
     }));
     nr = chain.narration; markovian = chain.report;
   } else {
-    const messages = narrativeMessages({ question, type: intent.type, scopeText, facts: relevantFacts(facts, hyps, base.slice(0, 6), intent.type), hypotheses: hyps.filter((h) => !offHypotheses(intent.type).includes(h.id)), titles, focusDates: intent.dates, hasRecommendation: vctx.requireRecommendation === true });
+    const messages = narrativeMessages({ question, type: intent.type, scopeText, facts: relevantFacts(facts, hyps, base.slice(0, 6), intent.type), hypotheses: hyps.filter((h) => !offHypotheses(intent.type).includes(h.id)), titles, focusDates: intent.dates, hasRecommendation: vctx.requireRecommendation === true, quality });
     nr = await timed(emit, timings, "narrative", () => narrate({ env, messages, facts, vctx, maxCorrections: opts.maxCorrections ?? 2, deadlineMs: deadline.narrative, hedgeAfterMs: hedge.narrative }));
   }
   let answer: Answer;
@@ -197,7 +199,7 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
     answer = normalizeAnswer(nr.answer, facts, hyps);
     verification = { passed: true, attempts: nr.attempts, errors: [], errorDetail: [], history: nr.history, repairs: nr.repairs, mode: "llm" };
   } else {
-    answer = await timed(emit, timings, "template", async () => normalizeAnswer(templateAnswer(facts, hyps, intent.type), facts, hyps));
+    answer = await timed(emit, timings, "template", async () => normalizeAnswer(templateAnswer(facts, hyps, intent.type, quality), facts, hyps));
     const tv = verifyAnswer(answer, vctx);
     verification = { passed: tv.passed, attempts: nr.attempts, errors: [...nr.lastErrors, ...tv.errors.map((e) => `template: ${errorLine(e)}`)], errorDetail: [...nr.lastDetail, ...tv.errors], history: nr.history, repairs: [], mode: "template" };
   }

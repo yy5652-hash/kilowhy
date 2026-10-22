@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { investigate } from "./agent.ts";
 import { isClarification, type InvestigationResult } from "./agent_types.ts";
 import { scenario, fakeChat, factLines, route, INTENT_OK, PLAN_OK, goodNarrative, interpretOk } from "./agent_testkit.ts";
-import { interpretTargets, CHAIN_CONFIG, BATCH_SIZE } from "./investigate_markovian.ts";
+import { interpretTargets, CHAIN_CONFIG, BATCH_SIZE, INTERPRET_DEADLINE_MS, INTERPRET_HEDGE_MS } from "./investigate_markovian.ts";
 import { checkReadings, chunkFacts } from "./markovian_prompts.ts";
 import { parseState } from "./markovian_state.ts";
 import { totalsOf, withNaive } from "./markovian_log.ts";
@@ -29,14 +29,15 @@ function visibleNarrative(req: ChatRequest): string {
   const status = (h: string) => sys.match(new RegExp(`^${h} [^\\n]*: (supported|ruled_out)$`, "m"))?.[1];
   const supported = L.find((l) => l.hyp !== "-" && l.hyp !== "REC" && status(l.hyp) === "supported");
   const ruled = L.find((l) => l.hyp === "H5" && status("H5") === "ruled_out");
+  const top = L.find((l) => l.hyp === "H3") ?? supported;                       // a question about a site opens with its largest supported cause
   return JSON.stringify({
     headline: `Your bill rose by ${f("Change in the bill, window")}`,
     sentences: [
-      { text: `Your bill rose by ${f("Change in the bill, window")} (${f("Change in the bill as a share")}), from ${f("Electricity bill in window A")} to ${f("Electricity bill in window B")}.` },
+      { text: `Your bill rose by ${f("Change in the bill, window")} (${f("Change in the bill as a share")}), from ${f("Electricity bill in window A")} to ${f("Electricity bill in window B")}${top ? `, mostly because of {${top.id}}` : ""}.` },
       ...(supported ? [{ text: `One supported test adds {${supported.id}}.` }] : []),
     ],
     ruledOut: ruled ? [{ hypothesis: "H5", text: `Timing is ruled out: {${ruled.id}}.` }] : [],
-    recommendation: { text: `On window B prices, load shifting would have saved ${f("Load shift: money saved")}; as a historical counterfactual, the flat tariff would have cost ${f("Flat tariff minus Agile in window B")} more.` },
+    recommendation: { text: `Staying on Agile saved {${L.find((l) => l.label.startsWith("Flat tariff minus Agile in window B"))!.id}:abs} against a flat business tariff over the four weeks, a historical counterfactual, not advice; shifting flexible load would have saved only ${f("Load shift: money saved")} and ${f("Load shift: carbon saved")}.` },
   });
 }
 const badVisible = (req: ChatRequest): string => { const n = JSON.parse(visibleNarrative(req)); n.sentences[0].text = "Your bill rose by £999.99."; return JSON.stringify(n); };
@@ -59,6 +60,13 @@ describe("the chain", () => {
     assert.equal(o.llmCalls.map((c) => c.step).filter((s) => s.startsWith("interpret")).length, Math.ceil(targets.length / BATCH_SIZE));
     assert.equal(BATCH_SIZE, 5);
     assert.match(o.markovian!.chunks.at(-1)!.label, /verify \(passed\)/);
+  });
+  it("interpret chunks give Nightshift a real head start: the labelled NVIDIA call joins after 20 s, the chunk gives up after 40 s", async () => {
+    const { chat } = await mk();
+    const interpret = chat.requests.filter((r) => r.step === "interpret");
+    assert.ok(interpret.length >= 1);
+    assert.equal(INTERPRET_HEDGE_MS, 20_000); assert.equal(INTERPRET_DEADLINE_MS, 40_000);
+    for (const r of interpret) { assert.equal(r.req.hedgeAfterMs, INTERPRET_HEDGE_MS); assert.equal(r.req.deadlineMs, INTERPRET_DEADLINE_MS); assert.ok(r.req.hedgeAfterMs! < r.req.deadlineMs!); }
   });
   it("engine plain is the single plan + narrative loop with no chain", async () => {
     const { o } = await mk({}, { engine: "plain" });

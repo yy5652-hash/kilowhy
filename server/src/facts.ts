@@ -10,6 +10,7 @@ import type { Recommendation, TariffComparison } from "./recommend.ts";
 import type { DateWindow } from "./windows.ts";
 import { hypothesisFacts } from "./facts_hyp.ts";
 import { singleRowNumbers } from "./agent_extra.ts";
+import { annotateOptions } from "./facts_options.ts";
 
 export interface Fact {
   id: string;                 // "F1", "F2", ...
@@ -21,6 +22,8 @@ export interface Fact {
   evidence: string;           // E# the value comes from ("" for a remembered note)
   hypothesis?: string;        // H1..H11 when the fact belongs to one hypothesis; REC for the recommendation; absent for neutral facts
   memory?: FactMemory;        // M# facts only: a memory recalled from H-MEM (it has no E#: evidence is "")
+  rank?: number;              // recommendation facts only: 1 = the option with the largest £ effect (facts_options.ts)
+  option?: "tariff" | "load_shift";
 }
 export interface FactMemory { id: string; origin: "user" | "agent"; site?: string; learnedAt: string; validFrom?: string; confidence: number; relevance: number; bearsOn?: string[] }   // bearsOn: facts about the same subject (a logged event whose text overlaps the note)
 
@@ -108,7 +111,7 @@ function recommendationFacts(t: FactTable, i: FactsInput): void {
     for (const k of ["B", "A"] as const) {
       t.add(`flat_total_${k}`, `Flat tariff bill for the same kWh in window ${k} (energy + standing, VAT at the contract rate)`, w[k].flat.totalGbp, "GBP", e, "REC");
       t.add(`agile_total_${k}`, `Actual Agile bill in window ${k} (energy + standing)`, w[k].agile.totalGbp, "GBP", e, "REC");
-      t.add(`flat_minus_agile_${k}`, `Flat tariff minus Agile in window ${k} (positive: flat would cost more)`, w[k].flatMinusAgileGbp, "GBP", e, "REC");
+      t.add(`flat_minus_agile_${k}`, `Flat tariff minus Agile in window ${k} (positive: the flat tariff would have cost more, so staying on Agile saved this much; negative: the flat tariff would have been cheaper)`, w[k].flatMinusAgileGbp, "GBP", e, "REC");
     }
     t.add("tariff_cheaper_B", "Cheaper tariff in window B on the same kWh", tariff.cheaperInWindowB, "text", e, "REC");
   }
@@ -120,6 +123,7 @@ export function buildFacts(input: FactsInput): Fact[] {
   decompositionFacts(t, input);
   hypothesisFacts(t, input);
   recommendationFacts(t, input);
+  annotateOptions(t.facts);
   (input.extras ?? []).forEach((x, n) => {
     t.add(`extra_${n + 1}_rows`, `Extra query ${n + 1} (${x.purpose}): rows returned`, x.rows, "count", x.evidence, "EXTRA");
     for (const [col, v] of singleRowNumbers(input.evidence, x.evidence)) t.add(`extra_${n + 1}_${col}`, `Extra query ${n + 1} (${x.purpose}): ${col}`, v, "number", x.evidence, "EXTRA");

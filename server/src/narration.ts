@@ -5,6 +5,7 @@
 //  - unknown placeholder ids and sentences without any placeholder are errors.
 import type { Fact } from "./facts.ts";
 import { renderPlaceholders } from "./placeholders.ts";
+import { oneClause, tidyHeadline, type QualityCtx } from "./quality.ts";
 import { resolveHypothesis, type Answer, type AnswerItem, type HypInfo, type RuledOutItem, type VerifyError } from "./verifier.ts";
 
 export interface ReplyShape {
@@ -15,13 +16,15 @@ export interface Narration { answer: Answer; repairs: string[]; errors: string[]
 const asObj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
 const evidenceList = (v: unknown): string[] => (Array.isArray(v) ? v : typeof v === "string" ? v.split(/[,;]/) : []).map((x) => String(x).replace(/[[\]\s]/g, "").toUpperCase()).filter((x) => /^E\d+$/.test(x));
 
-export function answerFromReply(reply: ReplyShape, facts: Fact[], hyps: HypInfo[], evidenceIds: Set<string>): Narration {
+export function answerFromReply(reply: ReplyShape, facts: Fact[], hyps: HypInfo[], evidenceIds: Set<string>, q?: QualityCtx): Narration {
   const byId = new Map(facts.map((f) => [f.id, f]));
   const statusOf = new Map(hyps.map((h) => [h.id, h.status]));
   const errors: string[] = [];
   const repairs: string[] = [];
   const item = (raw: unknown, where: string, given: unknown = undefined, dropWithoutCitation = false): AnswerItem | null => {
-    const text = typeof raw === "string" ? raw : "";
+    let text = typeof raw === "string" ? raw : "";
+    const unbracketed = text.replace(/\s*\[\s*E\d+(?:\s*[,;]?\s*E\d+)*\s*\]/g, "");   // inline evidence markers such as "[E1, E5]": the answer shows its evidence itself
+    if (unbracketed !== text) { repairs.push(`${where}: inline evidence markers removed`); text = unbracketed; }
     const r = renderPlaceholders(text, byId, where);
     if (dropWithoutCitation && r.facts.length === 0 && r.errors.length === 1 && /no placeholder/.test(r.errors[0])) {   // prose with no figure cannot be checked: leave it out
       repairs.push(`${where} dropped: it has no {F#} placeholder, so nothing in it can be checked`);
@@ -50,7 +53,9 @@ export function answerFromReply(reply: ReplyShape, facts: Fact[], hyps: HypInfo[
     const o = asObj(r);
     const h = typeof o.hypothesis === "string" ? resolveHypothesis(o.hypothesis, hyps) : null;
     if (!h || h.status !== "ruled_out") { repairs.push(`ruledOut[${i}] dropped: ${String(o.hypothesis)} is ${h ? h.status : "not a tested hypothesis"}, not ruled_out`); return; }
-    const it = item(o.text, `ruledOut[${i}]`, o.evidence, true);
+    let rawText: unknown = o.text;
+    if (q && typeof o.text === "string") { const oc = oneClause(o.text); rawText = oc.text; if (oc.trimmed) repairs.push(`ruledOut[${i}] trimmed to one short clause`); }
+    const it = item(rawText, `ruledOut[${i}]`, o.evidence, true);
     if (!it) return;
     if (it.facts.some((id) => { const t = tagOf(id); return t && statusOf.get(t) === "supported"; })) { repairs.push(`ruledOut[${i}] dropped: it cites a fact of a supported hypothesis`); return; }
     ruledOut.push({ ...it, hypothesis: h.id });
@@ -65,7 +70,8 @@ export function answerFromReply(reply: ReplyShape, facts: Fact[], hyps: HypInfo[
     repairs.push(...r.repairs);
     errors.push(...r.errors.filter((e) => !/no placeholder/.test(e)));
     headline = r.text;
-  }
+    if (q || headline) { const h = tidyHeadline(headline, q, facts); headline = h.text; repairs.push(...h.notes); }
+  } else if (q?.fallbackHeadline) { headline = q.fallbackHeadline; repairs.push("headline was empty: the deterministic headline was used"); }
   return { answer: { headline, sentences, ruledOut, recommendation: rec ?? { text: "", facts: [], evidence: [] } }, repairs, errors };
 }
 
@@ -82,4 +88,11 @@ export function dropContradictions(answer: Answer, errors: VerifyError[]): { ans
   const notes = [...badSentences].sort().map((i) => `sentences[${i}] dropped: ${errors.find((e) => e.part === "sentences" && e.index === i)!.reason}`)
     .concat([...badRuled].sort().map((i) => `ruledOut[${i}] dropped: ${errors.find((e) => e.part === "ruledOut" && e.index === i)!.reason}`));
   return { answer: { ...answer, sentences: answer.sentences.filter((_, i) => !badSentences.has(i)), ruledOut: answer.ruledOut.filter((_, i) => !badRuled.has(i)) }, notes };
+}
+
+/** The tariff comparison must be called a historical counterfactual. When that is the only thing wrong, the standard clause is appended (no digits, no facts). */
+export function addCounterfactualFraming(answer: Answer, errors: VerifyError[]): { answer: Answer; notes: string[] } | null {
+  if (errors.length === 0 || !errors.every((e) => e.part === "recommendation" && /must be framed as a historical counterfactual/.test(e.reason))) return null;
+  const text = `${answer.recommendation.text.trim().replace(/[.\s]*$/, "")}. This is a historical counterfactual on the same kWh, not advice.`;
+  return { answer: { ...answer, recommendation: { ...answer.recommendation, text } }, notes: ["recommendation: the historical-counterfactual clause was appended"] };
 }

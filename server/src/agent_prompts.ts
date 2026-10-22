@@ -9,6 +9,8 @@ import type { Checked } from "./agent_llm.ts";
 import { INTENT_TYPES, type Intent, type IntentType } from "./agent_types.ts";
 import { createHash } from "node:crypto";
 import type { HypInfo } from "./verifier.ts";
+import type { QualityCtx } from "./quality.ts";
+import { optionsBlock } from "./facts_options.ts";
 import type { SiteRef } from "./agent_sites.ts";
 
 const strs = (v: unknown): string[] => (Array.isArray(v) ? v : typeof v === "string" && v.trim() ? v.split(/[,;]/) : []).map((x) => String(x).trim()).filter(Boolean);
@@ -70,7 +72,7 @@ export function checkPlan(v: unknown): Checked<PlanReply> {
 
 // ---------------------------------------------------------------- narrative (mode deep): placeholders, never digits
 export const NARRATIVE_MAX_TOKENS = 2200;   // the JSON itself is about 530 tokens; the reasoning before it about 700 (a 500 or 900 cap truncated every reply)
-export interface NarrativeInput { question: string; type: IntentType; scopeText: string; facts: Fact[]; hypotheses: HypInfo[]; titles: Record<string, string>; focusDates: string[]; hasRecommendation: boolean }
+export interface NarrativeInput { question: string; type: IntentType; scopeText: string; facts: Fact[]; hypotheses: HypInfo[]; titles: Record<string, string>; focusDates: string[]; hasRecommendation: boolean; quality?: QualityCtx }
 
 const TYPE_HINT: Record<IntentType, string> = {
   why_cost_change: "Explain why the bill changed between the two windows.",
@@ -105,23 +107,34 @@ export function factsTable(facts: Fact[]): string {
 
 export function narrativeMessages(i: NarrativeInput): ChatMessage[] {
   const statuses = i.hypotheses.filter((h) => h.status !== "inconclusive").map((h) => `${h.id} ${i.titles[h.id] ?? h.name}: ${h.status}`).join("\n");
+  const q = i.quality;
+  const costType = i.type === "why_cost_change" || i.type === "what_to_change";
+  const siteRule = q?.siteScoped && costType
+    ? ` The question is about ${q.siteName ?? "these sites"} only, so the headline and the first sentence are about ITS OWN change: cite the fact "Change in the bill, window B minus window A"${q.topCause ? ` and name its largest supported cause (${q.topCause.hyp} ${i.titles[q.topCause.hyp] ?? q.topCause.title})` : ""}; never open with a statistic about a single day or about other sites.`
+    : costType ? " Cite the fact \"Change in the bill, window B minus window A\" in the first sentence; never open with a statistic about a single day." : "";
+  const options = q ? optionsBlock(q.options) : "";
+  const tariffOpt = q?.options.find((o) => o.key === "tariff");
+  const tariffExample = tariffOpt ? (tariffOpt.direction === "agile_cheaper" ? `for example "staying on Agile saved {${tariffOpt.factId}:abs} against a flat business tariff over the four weeks"` : `for example "a flat business tariff would have cost {${tariffOpt.factId}:abs} less than Agile over the four weeks"`) : "for example \"staying on Agile saved ... against a flat business tariff over the four weeks\"";
+  const recRule = !i.hasRecommendation ? "There are no REC facts, so leave the text empty."
+    : options ? `One or two sentences. The options below are ranked by their computed £ effect, largest first. Lead with option 1 (its figure is the first £ figure you write), then mention the others after it, each with its own figure; never reorder them. If Agile was cheaper than the flat tariff, say so plainly as the main finding, ${tariffExample}: it is a historical counterfactual on the same kWh, not advice, and not a change to make. Present the load shift with its own small £ and carbon figures as they are. An unusual day, a fault or a logged event only explains a past change: never use one as an option, a saving or a "lever".\n${options}`
+    : "One or two sentences using the REC facts. A flat-tariff comparison must be called a historical counterfactual, not advice.";
   const system =
 `You write the answer to a small-business owner's question about their electricity bill, in plain English: no jargon, no markdown. ${TYPE_HINT[i.type]}
 Reply with ONE JSON object and nothing else: {"headline": "...", "sentences": [{"text": "..."}], "ruledOut": [{"hypothesis": "H5", "text": "..."}], "recommendation": {"text": "..."}}
 Rules:
 1. NEVER write a digit. Wherever a number, amount, percentage, date or time belongs, write the placeholder of the fact, for example {F9}; the code replaces it with the exact figure. Use {F9:abs} to drop a minus sign when you write "fell by" or "cut". A placeholder already contains its unit (£, %, kWh, pp, sd), so never write a unit word after it. Spell small counts in words, and do not mention thresholds, limits or window lengths as numbers.
-2. "sentences": 4 to 6 sentences, each with at least one placeholder. The first gives the size of the change and the biggest supported cause; ${i.type === "what_to_change" ? "the rest cover the supported causes the owner can act on and what could be changed (REC facts)" : "the rest give the other supported causes with their sizes"}. Only hypotheses marked supported may be presented as causes; never mention a hypothesis that is not listed below.
-3. "ruledOut": one short item per ruled_out hypothesis worth a mention (at most four), with its id and at least one placeholder. Nothing else goes there.
-4. "recommendation": one or two sentences using the REC facts. ${i.hasRecommendation ? "A flat-tariff comparison must be called a historical counterfactual, not advice." : "There are no REC facts, so leave the text empty."}
-5. Say what each fact says, no more: do not give a figure a cause its description does not name. The data are synthetic SAMPLE meter readings; do not call them real measurements.
-6. "headline": one short line; placeholders allowed.${i.facts.some((f) => f.memory) ? `
+2. "sentences": 4 to 6 sentences, each with at least one placeholder. The first gives the size of the change and the biggest supported cause; ${i.type === "what_to_change" ? "the rest cover the supported causes the owner can act on and what could be changed (REC facts)" : "the rest give the other supported causes with their sizes"}. Only hypotheses marked supported may be presented as causes; never mention a hypothesis that is not listed below.${siteRule}
+3. "ruledOut": one item per ruled_out hypothesis worth a mention (at most four), each ONE short clause of at most 20 words (one sentence, no second sentence), with its id and a placeholder for any figure; never a figure written as digits. Nothing else goes there.
+4. "recommendation": ${recRule}
+5. Say what each fact says, no more: do not give a figure a cause its description does not name. An unusual day in window A (the baseline) raised the baseline: say it is in the baseline, never that it added to the change. The data are synthetic SAMPLE meter readings; do not call them real measurements.
+6. "headline": one line in sentence case (never all capitals), at most 90 characters, containing the size of the change as a placeholder (the change in the bill${i.type === "why_emissions" ? " or in emissions" : ""}).${i.facts.some((f) => f.memory) ? `
 7. Facts whose id starts with M are notes remembered from earlier (the owner's, or an earlier investigation's). When a note's description says it bears on other facts, use the note together with those facts in the same sentence or ruled-out item: say what the facts show and that the note explains it, citing the note with its placeholder, for example {M1}. Attach a note only to the facts its description says it bears on, never to unrelated facts (a note about a schedule change on one date does not explain a different day). A note is never a source of figures on its own and never makes a test that is not supported a cause; if the test it bears on is not supported, mention it only in a ruledOut item for that test.` : ""}
 Hypotheses:
 ${statuses}
 Facts (id [hypothesis] description = value):
 ${factsTable(i.facts)}`;
   const focus = i.focusDates.length ? `\nThe owner asked about: ${i.focusDates.join(", ")}.` : "";
-  const fingerprint = createHash("sha256").update(`${statuses}\n${factsTable(i.facts)}`).digest("hex").slice(0, 12);   // a cached reply is only valid for the same facts table
+  const fingerprint = createHash("sha256").update(system).digest("hex").slice(0, 12);   // a cached reply is only valid for the same instructions and the same facts table
   return [{ role: "system", content: system }, { role: "user", content: `Question: ${i.question}\nScope: ${i.scopeText}${focus}\nFacts table ${fingerprint}: write the answer from it.` }];
 }
 

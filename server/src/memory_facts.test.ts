@@ -48,7 +48,7 @@ describe("the template mentions a remembered note next to the schedule change it
       const facts = [...base, note(site)], hyps = [{ id: "H5", name: "timing_shift", status: "ruled_out" as const }];
       const a = templateAnswer(facts, hyps, "why_cost_change");
       const item = a.ruledOut.find((r) => r.hypothesis === "H5")!;
-      assert.ok(item.facts.includes("M1"), `site ${site}`); assert.ok(item.text.includes('Your note on file says "Oven moved later" (your note, 2026-10-22)'));
+      assert.ok(item.facts.includes("M1"), `site ${site}`); assert.ok(item.text.includes('your note on file says "Oven moved later" (your note, 2026-10-22)'));
       assert.ok(item.evidence.length > 0 && item.evidence.every(Boolean), "evidence comes from the data facts only");
       assert.equal(verifyAnswer({ ...a, headline: a.headline, sentences: [{ text: "Timing: £1.03.", facts: ["F1"], evidence: ["E1"] }] }, { facts, evidenceIds: ["E1"], hypotheses: hyps }).errors.filter((e) => e.part === "ruledOut").length, 0);
     }

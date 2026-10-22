@@ -51,18 +51,23 @@ export const ph = (lines: FactLine[], labelStart: string, abs = false): string =
 export const INTENT_OK = (over: object = {}) => JSON.stringify({ type: "why_cost_change", sites: [], dates: [], ...over });
 export const PLAN_OK = (over: object = {}) => JSON.stringify({ hypotheses: ["H1", "H2", "H3", "H4", "H5", "H6", "H11"], extraSql: [], ...over });
 
-/** A placeholder narrative (no digits) that is valid for the scenario above, where H3 is supported and H5 is ruled out. */
+const CAUSE_LABELS: Record<string, string> = { H1: "Price-level effect L:", H3: "Weather part of the volume effect", H4: "Operational part of the volume effect", H5: "Timing effect T:", H8: "Standing-charge effect S" };
+/** A placeholder narrative (no digits) that is valid for the scenario above, where H3 is supported and H5 is ruled out. For a question about one site it names that site's largest cause, as the prompt asks. */
 export function goodNarrative(req: ChatRequest): string {
   const L = factLines(req);
   const p = (s: string, abs = false) => ph(L, s, abs);
+  const named = String(req.messages[0].content).match(/largest supported cause \((H\d+) /)?.[1];
+  const causeLabel = (named && CAUSE_LABELS[named]) || "Weather part of the volume effect";
+  const second = !named || named === "H3" ? `Colder weather added ${p("Weather part of the volume effect")} (${p("Weather part as a share")} of the change).` : `That cause alone accounts for ${p(causeLabel)}.`;
   return JSON.stringify({
     headline: `Your bill rose by ${p("Change in the bill, window")}`,
     sentences: [
-      { text: `Your bill rose by ${p("Change in the bill, window")} (${p("Change in the bill as a share")}), from ${p("Electricity bill in window A")} to ${p("Electricity bill in window B")}.` },
-      { text: `Colder weather added ${p("Weather part of the volume effect")} (${p("Weather part as a share")} of the change).` },
+      { text: `Your bill rose by ${p("Change in the bill, window")} (${p("Change in the bill as a share")}), from ${p("Electricity bill in window A")} to ${p("Electricity bill in window B")}, mostly because of ${!named || named === "H3" ? "colder weather" : "the largest supported cause"} (${p(causeLabel)}).` },
+      { text: second },
     ],
     ruledOut: [{ hypothesis: "H5", text: `Timing is ruled out: it moved the bill by only ${p("Timing effect T:")} (${p("Timing effect T as a share")}).` }],
-    recommendation: { text: `On window B prices, load shifting would have saved ${p("Load shift: money saved")}; as a historical counterfactual, the flat tariff would have cost ${p("Flat tariff minus Agile in window B")} more.` },
+    // the option with the largest £ effect first (here the tariff counterfactual: Agile was cheaper), then the small load shift with its £ and kgCO2e
+    recommendation: { text: `Staying on Agile saved ${p("Flat tariff minus Agile in window B", true)} against a flat business tariff over the four weeks, a historical counterfactual on the same electricity, not advice; shifting flexible load would have saved only ${p("Load shift: money saved")} and ${p("Load shift: carbon saved")}.` },
   });
 }
 

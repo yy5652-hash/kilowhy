@@ -6,6 +6,7 @@
 // Unsigned tokens are compared by magnitude ("fell by £12.34" matches −£12.34); an explicit sign must agree with the fact.
 import type { Fact } from "./facts.ts";
 import { kindOfUnit, type TokenKind } from "./facts_format.ts";
+import type { QualityCtx } from "./quality.ts";
 
 export type TokenType = TokenKind | "date" | "time" | "abbrev";
 export interface Token {
@@ -114,7 +115,11 @@ export interface HypInfo { id: string; name: string; status: HypStatus }
 export interface AnswerItem { text: string; facts: string[]; evidence: string[] }
 export interface RuledOutItem extends AnswerItem { hypothesis: string }
 export interface Answer { headline: string; sentences: AnswerItem[]; ruledOut: RuledOutItem[]; recommendation: AnswerItem }
-export interface VerifyCtx { facts: Fact[]; evidenceIds: Iterable<string>; hypotheses: HypInfo[]; requireRecommendation?: boolean }
+export interface VerifyCtx {
+  facts: Fact[]; evidenceIds: Iterable<string>; hypotheses: HypInfo[]; requireRecommendation?: boolean;
+  quality?: QualityCtx;                                   // meaning checks (quality.ts): the data they need, also read by narration.ts and the prompts
+  checks?: ((answer: Answer) => VerifyError[])[];         // extra checks run at the end of verifyAnswer (quality.ts supplies them)
+}
 export type Part = "headline" | "sentences" | "ruledOut" | "recommendation";
 export interface VerifyError { part: Part; index: number; reason: string }
 export interface VerifyResult { passed: boolean; errors: VerifyError[] }
@@ -219,6 +224,9 @@ export function verifyAnswer(answer: Answer, ctx: VerifyCtx): VerifyResult {
     if (cited.some((f) => f.key.startsWith("flat_") || f.key.startsWith("agile_") || f.key === "tariff_name") && !/counterfactual|would have/i.test(recText)) {
       push("recommendation", 0, "the tariff comparison must be framed as a historical counterfactual (say \"counterfactual\" or \"would have\")");
     }
+  }
+  if (ctx.checks?.length && Array.isArray(answer?.sentences) && Array.isArray(answer?.ruledOut) && answer?.recommendation && typeof answer.headline === "string") {
+    for (const check of ctx.checks) errors.push(...check(answer));
   }
   return { passed: errors.length === 0, errors };
 }

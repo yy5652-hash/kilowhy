@@ -46,7 +46,7 @@ export function renderAnswer(o: InvestigationResult): string {
   out.push(`Q: ${o.question}`);
   out.push(`Scope ${o.scope.label} (${o.scope.sites.map((s) => `${s.id} ${s.name}`).join("; ")}); window A ${o.scope.windowA.from}..${o.scope.windowB.from} vs window B ${o.scope.windowB.from}..${o.scope.windowB.toExclusive} (end exclusive)`);
   out.push(`NOTE: ${o.sampleDataNote}`, "");
-  out.push(wrap(a.headline.toUpperCase(), 100), "");
+  out.push(wrap(a.headline, 100), "");
   a.sentences.forEach((s, i) => out.push(sentence(s, `${i + 1}. `)));
   if (a.ruledOut.length) { out.push("", "Ruled out:"); for (const r of a.ruledOut) out.push(sentence(r, `  - ${r.hypothesis}: `)); }
   out.push("", a.recommendation.text ? "Recommendation:" : "Recommendation: none available");
