@@ -1,0 +1,422 @@
+{
+  "generated_at": "2026-10-22T00:24:01.987Z",
+  "note": "meter kWh are SAMPLE data; prices and temperatures are real",
+  "windows": {
+    "A": {
+      "from": "2026-08-27",
+      "to_exclusive": "2026-09-24",
+      "days": 28
+    },
+    "B": {
+      "from": "2026-09-24",
+      "to_exclusive": "2026-10-22",
+      "days": 28
+    }
+  },
+  "definitions": "V=(Q_B-Q_A)*Pbar_A; L=Q_B*(Pbar_B*-Pbar_A); T=Q_B*(Pbar_B-Pbar_B*); S=days_B*sc_B-days_A*sc_A; V+L+T+S = total bill change. Pbar_B* = window-B prices on window-A usage shape. Weather split: OLS of daily kWh on HDD (base 15.5 C) in window A.",
+  "weather_caveat": "Window A has almost no heating degree days (sum HDD_A is about 0.6 vs about 45 in B), so the window-A slope is determined by a single day and the weather/operational split is not reliable; see weather.warnings and weather_pooled_diagnostic.",
+  "assumptions": [
+    "standing charge 37.6525 p/day inc VAT per site (kilowhy.contract, constant across both windows), so S = 0",
+    "GBP display values are rounded to pence with largest-remainder allocation so the parts add up to the displayed total change; raw pence are kept in raw_pence"
+  ],
+  "zetaris_run_ids": {
+    "contract": "8a72e24b-bd30-4925-b847-d5adc29d3b3a",
+    "slots_A": "46642349-2f68-47f6-a494-c3f745f6adf5",
+    "slots_B": "bcd8817e-b713-4bd3-a0ef-01eeb8c33d35",
+    "daily_kwh": "075d3bdd-efcd-4db4-acad-68a9cee59a93",
+    "daily_temp": "a60a0cc2-e17f-483d-8b4e-4b77c086271b"
+  },
+  "sql": {
+    "contract": "SELECT standing_charge_p_per_day FROM kilowhy.contract",
+    "slots_A": "SELECT m.site_id, m.ts, m.kwh, r.p_kwh_inc_vat AS p\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start\nWHERE m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00'\nORDER BY m.site_id, m.ts",
+    "slots_B": "SELECT m.site_id, m.ts, m.kwh, r.p_kwh_inc_vat AS p\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start\nWHERE m.ts >= timestamp '2026-09-24 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nORDER BY m.site_id, m.ts",
+    "daily_kwh": "SELECT site_id, CAST(ts AS DATE) AS d, SUM(kwh) AS kwh FROM kilowhy.meter_hh\nWHERE ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00'\nGROUP BY 1, 2 ORDER BY 1, 2",
+    "daily_temp": "SELECT CAST(ts AS DATE) AS d, AVG(temp_c) AS t_mean, COUNT(*) AS n FROM kilowhy.temp_hourly\nWHERE ts >= timestamp '2026-08-27 00:00:00' AND ts < timestamp '2026-10-22 00:00:00'\nGROUP BY 1 ORDER BY 1"
+  },
+  "pass": true,
+  "checks": [
+    {
+      "check": "same sites in both windows",
+      "pass": true,
+      "detail": "S1,S2,S3"
+    },
+    {
+      "check": "S1 windows aligned (1344 slots, +28 days)",
+      "pass": true,
+      "detail": "1344/1344"
+    },
+    {
+      "check": "S2 windows aligned (1344 slots, +28 days)",
+      "pass": true,
+      "detail": "1344/1344"
+    },
+    {
+      "check": "S3 windows aligned (1344 slots, +28 days)",
+      "pass": true,
+      "detail": "1344/1344"
+    },
+    {
+      "check": "24 hourly temperatures per day",
+      "pass": true,
+      "detail": "56 days"
+    },
+    {
+      "check": "combined series uses one price per slot",
+      "pass": true
+    },
+    {
+      "check": "S1 daily kWh = slot kWh",
+      "pass": true
+    },
+    {
+      "check": "S1 identityError < 1e-6 pence",
+      "pass": true,
+      "detail": "9.094947017729282e-12"
+    },
+    {
+      "check": "S1 weather volume = decompose volume",
+      "pass": true
+    },
+    {
+      "check": "S1 C_A matches reconciliation.json",
+      "pass": true,
+      "detail": "781.52 vs 781.52"
+    },
+    {
+      "check": "S1 C_B matches reconciliation.json",
+      "pass": true,
+      "detail": "920.48 vs 920.48"
+    },
+    {
+      "check": "S2 daily kWh = slot kWh",
+      "pass": true
+    },
+    {
+      "check": "S2 identityError < 1e-6 pence",
+      "pass": true,
+      "detail": "3.637978807091713e-12"
+    },
+    {
+      "check": "S2 weather volume = decompose volume",
+      "pass": true
+    },
+    {
+      "check": "S2 C_A matches reconciliation.json",
+      "pass": true,
+      "detail": "664.13 vs 664.13"
+    },
+    {
+      "check": "S2 C_B matches reconciliation.json",
+      "pass": true,
+      "detail": "768.8 vs 768.8"
+    },
+    {
+      "check": "S3 daily kWh = slot kWh",
+      "pass": true
+    },
+    {
+      "check": "S3 identityError < 1e-6 pence",
+      "pass": true,
+      "detail": "0"
+    },
+    {
+      "check": "S3 weather volume = decompose volume",
+      "pass": true
+    },
+    {
+      "check": "S3 C_A matches reconciliation.json",
+      "pass": true,
+      "detail": "524.77 vs 524.77"
+    },
+    {
+      "check": "S3 C_B matches reconciliation.json",
+      "pass": true,
+      "detail": "621.06 vs 621.06"
+    },
+    {
+      "check": "ALL daily kWh = slot kWh",
+      "pass": true
+    },
+    {
+      "check": "ALL identityError < 1e-6 pence",
+      "pass": true,
+      "detail": "0"
+    },
+    {
+      "check": "ALL weather volume = decompose volume",
+      "pass": true
+    },
+    {
+      "check": "ALL C_A = sum of site C_A",
+      "pass": true,
+      "detail": "197042.500956 vs 197042.500956"
+    },
+    {
+      "check": "ALL C_B = sum of site C_B",
+      "pass": true,
+      "detail": "231033.952734 vs 231033.952734"
+    }
+  ],
+  "results": [
+    {
+      "site": "S1",
+      "scope": "site",
+      "sample_meter_data": true,
+      "raw_pence": {
+        "Q_A_kwh": 3060.183,
+        "Q_B_kwh": 3312.941,
+        "C_A": 78152.0515125,
+        "C_B": 92047.528746,
+        "standing_A": 1054.27,
+        "standing_B": 1054.27,
+        "pbar_A": 25.538358821188144,
+        "pbar_B": 27.784234233570714,
+        "pbar_B_star": 27.674361094254824,
+        "delta_energy": 13895.477233500002,
+        "delta_total": 13895.477233500002,
+        "volume": 6455.024498925868,
+        "price": 7076.449506535799,
+        "timing": 364.00322803832626,
+        "standing": 0,
+        "identity_error": 9.094947017729282e-12,
+        "volume_weather": 18350.503402087536,
+        "volume_operational": -11895.478903161667
+      },
+      "gbp": {
+        "cost_A_incl_standing": 792.06,
+        "cost_B_incl_standing": 931.02,
+        "delta_total": 138.95,
+        "volume": 64.55,
+        "volume_weather": 183.5,
+        "volume_operational": -118.95,
+        "price": 70.76,
+        "timing": 3.64,
+        "standing": 0
+      },
+      "weather": {
+        "hdd_base_c": 15.5,
+        "beta_kwh_per_hdd": 16.191081354668,
+        "alpha_kwh_per_day": 108.93807009536664,
+        "r2": 0.04188137492840749,
+        "days_fit": 28,
+        "sum_hdd_A": 0.6124999999999989,
+        "sum_hdd_B": 44.99166666666668,
+        "delta_kwh_weather": 718.5466979523706,
+        "delta_kwh_total": 252.7579999999998,
+        "warnings": [
+          "low_r2",
+          "few_heating_days"
+        ]
+      },
+      "weather_pooled_diagnostic": {
+        "note": "fit on A+B pooled (56 days); diagnostic, not the primary window-A fit",
+        "beta_kwh_per_hdd": 4.224767441119796,
+        "r2": 0.4521312181958518,
+        "volume_weather_gbp": 47.88,
+        "volume_operational_gbp": 16.67,
+        "warnings": []
+      },
+      "top_day": {
+        "share": 0.32095402684321206,
+        "date": "2026-10-17",
+        "deltaPence": 4459.809373,
+        "totalPence": 13895.477233499998
+      }
+    },
+    {
+      "site": "S2",
+      "scope": "site",
+      "sample_meter_data": true,
+      "raw_pence": {
+        "Q_A_kwh": 2593.899,
+        "Q_B_kwh": 2772.791,
+        "C_A": 66413.0274465,
+        "C_B": 76880.1632215,
+        "standing_A": 1054.27,
+        "standing_B": 1054.27,
+        "pbar_A": 25.60355181389098,
+        "pbar_B": 27.726634723460943,
+        "pbar_B_star": 27.689523833811574,
+        "delta_energy": 10467.135775000002,
+        "delta_total": 10467.135775000002,
+        "volume": 4580.2705910905925,
+        "price": 5783.9644430876415,
+        "timing": 102.90074082176487,
+        "standing": 0,
+        "identity_error": 3.637978807091713e-12,
+        "volume_weather": 16063.32123525815,
+        "volume_operational": -11483.050644167557
+      },
+      "gbp": {
+        "cost_A_incl_standing": 674.67,
+        "cost_B_incl_standing": 779.34,
+        "delta_total": 104.67,
+        "volume": 45.8,
+        "volume_weather": 160.63,
+        "volume_operational": -114.83,
+        "price": 57.84,
+        "timing": 1.03,
+        "standing": 0
+      },
+      "weather": {
+        "hdd_base_c": 15.5,
+        "beta_kwh_per_hdd": 14.13695856790204,
+        "alpha_kwh_per_day": 92.33000403132714,
+        "r2": 0.031066159705948282,
+        "days_fit": 28,
+        "sum_hdd_A": 0.6124999999999989,
+        "sum_hdd_B": 44.99166666666668,
+        "delta_kwh_weather": 627.3864404446862,
+        "delta_kwh_total": 178.89200000000028,
+        "warnings": [
+          "low_r2",
+          "few_heating_days"
+        ]
+      },
+      "weather_pooled_diagnostic": {
+        "note": "fit on A+B pooled (56 days); diagnostic, not the primary window-A fit",
+        "beta_kwh_per_hdd": 3.0802387443394132,
+        "r2": 0.34792347566297577,
+        "volume_weather_gbp": 35,
+        "volume_operational_gbp": 10.8,
+        "warnings": []
+      },
+      "top_day": {
+        "share": 0.3095716698105027,
+        "date": "2026-10-17",
+        "deltaPence": 3240.3287000000005,
+        "totalPence": 10467.135775
+      }
+    },
+    {
+      "site": "S3",
+      "scope": "site",
+      "sample_meter_data": true,
+      "raw_pence": {
+        "Q_A_kwh": 2061.328,
+        "Q_B_kwh": 2226.39,
+        "C_A": 52477.421997,
+        "C_B": 62106.2607665,
+        "standing_A": 1054.27,
+        "standing_B": 1054.27,
+        "pbar_A": 25.458064896513314,
+        "pbar_B": 27.895499335920483,
+        "pbar_B_star": 28.06733976227946,
+        "delta_energy": 9628.838769500006,
+        "delta_total": 9628.838769500006,
+        "volume": 4202.159107948278,
+        "price": 5809.263468393089,
+        "timing": -382.5838068413608,
+        "standing": 0,
+        "identity_error": 0,
+        "volume_weather": 10175.148232931771,
+        "volume_operational": -5972.989124983494
+      },
+      "gbp": {
+        "cost_A_incl_standing": 535.32,
+        "cost_B_incl_standing": 631.61,
+        "delta_total": 96.29,
+        "volume": 42.02,
+        "volume_weather": 101.75,
+        "volume_operational": -59.73,
+        "price": 58.09,
+        "timing": -3.82,
+        "standing": 0
+      },
+      "weather": {
+        "hdd_base_c": 15.5,
+        "beta_kwh_per_hdd": 9.006088547123884,
+        "alpha_kwh_per_day": 73.4218489558888,
+        "r2": 0.005944858472204939,
+        "days_fit": 28,
+        "sum_hdd_A": 0.6124999999999989,
+        "sum_hdd_B": 44.99166666666668,
+        "delta_kwh_weather": 399.68270464756887,
+        "delta_kwh_total": 165.0619999999999,
+        "warnings": [
+          "low_r2",
+          "few_heating_days"
+        ]
+      },
+      "weather_pooled_diagnostic": {
+        "note": "fit on A+B pooled (56 days); diagnostic, not the primary window-A fit",
+        "beta_kwh_per_hdd": 3.72877807689288,
+        "r2": 0.36641377604024594,
+        "volume_weather_gbp": 42.13,
+        "volume_operational_gbp": -0.11,
+        "warnings": []
+      },
+      "top_day": {
+        "share": 0.2910948549557598,
+        "date": "2026-10-17",
+        "deltaPence": 2802.9054250000004,
+        "totalPence": 9628.838769500004
+      }
+    },
+    {
+      "site": "ALL",
+      "scope": "all",
+      "sample_meter_data": true,
+      "raw_pence": {
+        "Q_A_kwh": 7715.41,
+        "Q_B_kwh": 8312.122,
+        "C_A": 197042.500956,
+        "C_B": 231033.952734,
+        "standing_A": 3162.8100000000004,
+        "standing_B": 3162.8100000000004,
+        "pbar_A": 25.53882437304045,
+        "pbar_B": 27.794822156604535,
+        "pbar_B_star": 27.784450972404578,
+        "delta_energy": 33991.45177799999,
+        "delta_total": 33991.45177799999,
+        "volume": 15239.3229692857,
+        "price": 18665.922260359766,
+        "timing": 86.20654835452028,
+        "standing": 0,
+        "identity_error": 0,
+        "volume_weather": 44580.97643831368,
+        "volume_operational": -29341.65346902798
+      },
+      "gbp": {
+        "cost_A_incl_standing": 2002.05,
+        "cost_B_incl_standing": 2341.97,
+        "delta_total": 339.91,
+        "volume": 152.39,
+        "volume_weather": 445.81,
+        "volume_operational": -293.42,
+        "price": 186.66,
+        "timing": 0.86,
+        "standing": 0
+      },
+      "weather": {
+        "hdd_base_c": 15.5,
+        "beta_kwh_per_hdd": 39.334128469693965,
+        "alpha_kwh_per_day": 274.6899230825826,
+        "r2": 0.0398467807989058,
+        "days_fit": 28,
+        "sum_hdd_A": 0.6124999999999989,
+        "sum_hdd_B": 44.99166666666668,
+        "delta_kwh_weather": 1745.6158430446274,
+        "delta_kwh_total": 596.7119999999995,
+        "warnings": [
+          "low_r2",
+          "few_heating_days"
+        ]
+      },
+      "weather_pooled_diagnostic": {
+        "note": "fit on A+B pooled (56 days); diagnostic, not the primary window-A fit",
+        "beta_kwh_per_hdd": 11.033784262352091,
+        "r2": 0.5021122530005513,
+        "volume_weather_gbp": 125.06,
+        "volume_operational_gbp": 27.34,
+        "warnings": []
+      },
+      "top_day": {
+        "share": 0.30899072998105354,
+        "date": "2026-10-17",
+        "deltaPence": 10503.043498,
+        "totalPence": 33991.451778
+      }
+    }
+  ]
+}
