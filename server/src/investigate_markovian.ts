@@ -26,7 +26,7 @@ export const CHAIN_CONFIG = { chunkSize: 4000, maxChunks: 16, carryoverTokens: 8
 export const BATCH_SIZE = 5;
 // An interpret chunk is an enrichment, so the chunk goes on without its readings after the deadline. Nightshift is the primary provider (hackathon Power rule): it gets a real head start,
 // and only after the hedge delay does the labelled NVIDIA call join it.
-export const INTERPRET_DEADLINE_MS = 40_000, INTERPRET_HEDGE_MS = 20_000;
+export const INTERPRET_DEADLINE_MS = 50_000, INTERPRET_HEDGE_MS = 30_000;   // measured 2026-10-22: Nightshift answers medium prompts in 6-27 s (race of 6), so it gets 30 s before the labelled fallback joins
 
 export interface ChainArgs {
   env: LlmEnv;

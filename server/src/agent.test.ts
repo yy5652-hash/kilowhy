@@ -72,7 +72,7 @@ describe("investigate: a verified LLM answer", () => {
     await run(Q, chat, { deadlinesMs: { narrative: 12_000 }, hedgeAfterMs: { narrative: 5_000 } });
     assert.equal(chat.requests.find((r) => r.step === "narrative")!.req.deadlineMs, 12_000);
     assert.equal(chat.requests.find((r) => r.step === "narrative")!.req.hedgeAfterMs, 5_000);
-    assert.equal(chat.requests.find((r) => r.step === "plan")!.req.deadlineMs, 30_000);
+    assert.equal(chat.requests.find((r) => r.step === "plan")!.req.deadlineMs, DEADLINES_MS.plan);
   });
   it("every sentence cites existing facts and evidence, and evidence includes the cited facts' own evidence", async () => {
     const o = ok(await run(Q, happy()));

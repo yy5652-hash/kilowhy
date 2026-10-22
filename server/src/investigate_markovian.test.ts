@@ -61,11 +61,11 @@ describe("the chain", () => {
     assert.equal(BATCH_SIZE, 5);
     assert.match(o.markovian!.chunks.at(-1)!.label, /verify \(passed\)/);
   });
-  it("interpret chunks give Nightshift a real head start: the labelled NVIDIA call joins after 20 s, the chunk gives up after 40 s", async () => {
+  it("interpret chunks give Nightshift a real head start: the labelled NVIDIA call joins after 30 s, the chunk gives up after 50 s", async () => {
     const { chat } = await mk();
     const interpret = chat.requests.filter((r) => r.step === "interpret");
     assert.ok(interpret.length >= 1);
-    assert.equal(INTERPRET_HEDGE_MS, 20_000); assert.equal(INTERPRET_DEADLINE_MS, 40_000);
+    assert.equal(INTERPRET_HEDGE_MS, 30_000); assert.equal(INTERPRET_DEADLINE_MS, 50_000);
     for (const r of interpret) { assert.equal(r.req.hedgeAfterMs, INTERPRET_HEDGE_MS); assert.equal(r.req.deadlineMs, INTERPRET_DEADLINE_MS); assert.ok(r.req.hedgeAfterMs! < r.req.deadlineMs!); }
   });
   it("engine plain is the single plan + narrative loop with no chain", async () => {
