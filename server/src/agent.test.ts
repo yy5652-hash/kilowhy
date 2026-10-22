@@ -1,7 +1,7 @@
 // Agent loop tests with a scripted fake LLM and the synthetic data layer: no network, no Zetaris, no Nightshift.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { investigate, normalizeAnswer } from "./agent.ts";
+import { investigate, normalizeAnswer, DEADLINES_MS, HEDGE_AFTER_MS } from "./agent.ts";
 import { isClarification, type InvestigationResult } from "./agent_types.ts";
 import { renderOutcome, routeLine, wrap } from "./agent_render.ts";
 import { templateAnswer } from "./agent_template.ts";
@@ -64,8 +64,8 @@ describe("investigate: a verified LLM answer", () => {
     const by = (step: string) => chat.requests.find((r) => r.step === step)!.req;
     assert.equal(by("intent").mode, "auto"); assert.equal(by("plan").mode, "deep"); assert.equal(by("narrative").mode, "deep");
     assert.deepEqual([by("intent").max_tokens, by("plan").max_tokens, by("narrative").max_tokens], [800, 1200, 2200]);
-    assert.deepEqual([by("intent").deadlineMs, by("plan").deadlineMs, by("narrative").deadlineMs], [20000, 30000, 25000]);
-    assert.deepEqual([by("intent").hedgeAfterMs, by("plan").hedgeAfterMs, by("narrative").hedgeAfterMs], [8000, 8000, 6000]);
+    assert.deepEqual([by("intent").deadlineMs, by("plan").deadlineMs, by("narrative").deadlineMs], [DEADLINES_MS.intent, DEADLINES_MS.plan, DEADLINES_MS.narrative]);
+    assert.deepEqual([by("intent").hedgeAfterMs, by("plan").hedgeAfterMs, by("narrative").hedgeAfterMs], [HEDGE_AFTER_MS.intent, HEDGE_AFTER_MS.plan, HEDGE_AFTER_MS.narrative]);
   });
   it("the deadlines and hedges can be overridden", async () => {
     const chat = happy();
