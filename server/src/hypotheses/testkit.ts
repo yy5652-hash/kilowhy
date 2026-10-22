@@ -15,6 +15,7 @@ export function mulberry32(seed: number): () => number {
 type Win = "A" | "B";
 export interface SynthOpts {
   sites?: string[];
+  siteNames?: Record<string, string>;
   /** kWh of a half-hour slot; `day` 0..27 within the window, `slot` 0..47 (UTC half-hour of day) */
   kwh?: (site: string, win: Win, day: number, slot: number, date: string) => number;
   price?: (win: Win, day: number, slot: number) => number;
@@ -74,6 +75,7 @@ export function synth(o: SynthOpts = {}): Synth {
 
   const data: DataLayer = {
     async siteIds() { return sites; },
+    async siteInfo() { return sites.map((id) => ({ id, name: o.siteNames?.[id] ?? `Test Bakery ${id}` })); },
     async slots(q, meta) { const r = mine(q.sites); return wrap(meta, "slots", r, r as unknown as Row[], [{ view: "meter_hh", kind: "FILE: sample" }]); },
     async daily(q, meta) {
       const out: DailyRow[] = [];
