@@ -1,7 +1,7 @@
 // Tests for the data layer with an injected fake zsql (no Zetaris needed): SQL shape, typed parsing, evidence, caching, error handling.
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createZetarisData, slotsSql, dailySql, opsLogSql, contractSql, qualitySql, coverageSql, sitesSql, type ZSql } from "./data.ts";
+import { createZetarisData, slotsSql, dailySql, opsLogSql, contractSql, qualitySql, coverageSql, sitesSql, tariffSql, type ZSql } from "./data.ts";
 import { EvidenceStore, hashRows } from "./evidence.ts";
 import { guardSql } from "./sqlguard.ts";
 import { WINDOW_A, WINDOW_B } from "./windows.ts";
@@ -23,7 +23,7 @@ function fakeZsql(handler: (sql: string) => { headers: string[]; data: unknown[]
 describe("SQL templates", () => {
   const sql = {
     sites: sitesSql(), slots: slotsSql(["S1", "S2"], W), daily: dailySql(["S1"], W), ops: opsLogSql(["S1", "S3"]),
-    contract: contractSql(), quality: qualitySql(["S1", "S2", "S3"], W), coverage: coverageSql(["S1"], W),
+    contract: contractSql(), quality: qualitySql(["S1", "S2", "S3"], W), coverage: coverageSql(["S1"], W), tariff: tariffSql(["S1", "S2"], W),
   };
   it("every template passes the same read-only guard that LLM SQL has to pass", () => {
     for (const [name, s] of Object.entries(sql)) {
@@ -38,6 +38,12 @@ describe("SQL templates", () => {
     assert.match(sql.slots, /timestamp '2026-08-27 00:00:00'/);
     assert.match(sql.slots, /timestamp '2026-10-22 00:00:00'/);
     assert.match(sql.slots, /AS win/);
+  });
+  it("tariff: one join of meter, Agile rates and the flat tariff valid at each slot, ex-VAT flat rate, per site and window", () => {
+    assert.match(sql.tariff, /JOIN kilowhy\.flat_tariff f ON m\.ts >= f\.valid_from AND \(f\.valid_to IS NULL OR m\.ts < f\.valid_to\)/);
+    assert.match(sql.tariff, /SUM\(m\.kwh \* r\.p_kwh_inc_vat\) AS agile_inc_pence/);
+    assert.match(sql.tariff, /SUM\(m\.kwh \* f\.p_kwh_exc_vat\) AS flat_exc_pence/);
+    assert.match(sql.tariff, /m\.site_id IN \('S1', 'S2'\)/);
   });
   it("quality: thresholds 4 (zero run), 12 (flatline), 48 slots per day", () => {
     assert.match(sql.quality, /kwh = 0 AND n >= 4/);
@@ -104,6 +110,13 @@ describe("createZetarisData", () => {
     const q = (await layer.quality({ sites: ["S2"], windows: W }, m)).rows;
     assert.deepEqual(q[0], { check: "zero_run", site: "S2", start: "2026-09-01 03:00:00.0", end: "2026-09-01 04:30:00.0", n: 4, value: 0 });
     assert.deepEqual((await layer.coverage({ sites: ["S1"], windows: W }, m)).rows, [{ site: "S1", win: "A", nMeter: 1344, nPriced: 1344, nCarbon: 1340 }]);
+  });
+  it("parses tariff rows", async () => {
+    const headers = ["site_id", "win", "n_slots", "kwh", "agile_inc_pence", "flat_exc_pence", "flat_standing_exc_pence", "flat_rate_min_exc", "flat_rate_max_exc"];
+    const { zsql } = fakeZsql(() => ({ headers, data: [["S1", "B", "1344", "3312.9", "92047.5", "106327.3", "1439.8", "30.4635", "32.5891"]] }));
+    const f = await createZetarisData(zsql).tariff({ sites: ["S1"], windows: W }, meta());
+    assert.deepEqual(f.rows[0], { site: "S1", win: "B", nSlots: 1344, kwh: 3312.9, agileIncPence: 92047.5, flatExcPence: 106327.3, flatStandingExcPence: 1439.8, flatRateMinExc: 30.4635, flatRateMaxExc: 32.5891 });
+    assert.deepEqual(f.evidence.sources.map((s) => `${s.view}:${s.kind}`), ["meter_hh:FILE: sample", "agile_rates:REST: Octopus", "flat_tariff:REST: Octopus"]);
   });
   it("lists site ids without creating evidence", async () => {
     const { zsql } = fakeZsql(() => ({ headers: ["site_id"], data: [["S1"], ["S2"]] }));

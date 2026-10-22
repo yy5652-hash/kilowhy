@@ -8,8 +8,9 @@ import { mean } from "./stats.ts";
 import type { SlotRow } from "./data.ts";
 import { THRESHOLDS as T } from "./hypotheses/thresholds.ts";
 import { loadSlots } from "./hypotheses/context.ts";
+import { FLAT_TARIFF } from "./flat_tariff.ts";
 import type { HypCtx } from "./hypotheses/types.ts";
-import { gbp, metricMap, round } from "./hypotheses/util.ts";
+import { fetchMeta, gbp, metricMap, round } from "./hypotheses/util.ts";
 
 export interface ShiftOptions { maxKwhPerDay?: number; blockSlots?: number }
 export interface SiteShift {
@@ -110,4 +111,79 @@ export async function recommend(ctx: HypCtx, opts: ShiftOptions = {}): Promise<R
     ? `Move the peak-band (16:00-19:00) load above the night baseline (up to ${cap} kWh/day per site; ${round(total.shiftedKwh, 1)} kWh in total over ${total.daysUsed} days) into the cheapest ${n / 2}-hour block of the same day${blocks.length ? ` (typically ${blocks.join(", ")})`: ""}: saves £${total.savedGbp.toFixed(2)}${total.savedKgCo2e === null ? "" : ` and ${total.savedKgCo2e.toFixed(2)} kgCO2e`} on window-B prices (SAMPLE meter data).`
     : "No flexible peak-band load above the night baseline was found, so shifting would save nothing (SAMPLE meter data).";
   return { scope: ctx.scope.label, ok: true, maxKwhPerDay: cap, blockSlots: n, sites, total, text, evidence: [ev.id] };
+}
+
+// ---------------------------------------------------------------- v2: tariff counterfactual (flat business tariff vs the actual Agile bill)
+
+export const TARIFF_NOT_ADVICE = "Historical counterfactual on the same kWh over the two analysis windows, not advice: it ignores future price changes, contract terms, switching rules and VAT status.";
+
+export interface TariffSide { energyGbp: number; standingGbp: number; totalGbp: number }
+export interface TariffWindow {
+  win: "A" | "B"; slots: number; days: number; kwh: number;
+  agile: TariffSide;                        // actual: Agile energy (inc VAT) + contract standing charge
+  flat: TariffSide;                         // counterfactual: flat unit rate and standing charge, VAT at the contract rate
+  flatMinusAgileGbp: number;                // > 0: the flat tariff would have cost more
+  flatUnitRateRangeP: [number, number];     // ex VAT, p/kWh, over the slots of the window
+  coverageComplete: boolean;                // every half-hour of the window had a flat rate in force
+}
+export interface TariffComparison {
+  scope: string; ok: boolean; reason?: string;
+  historicalCounterfactual: true; notAdvice: string;
+  tariff: { productCode: string; tariffCode: string; name: string; region: string; why: string; vatRate: number | null; vatBasis: string };
+  windows: { A: TariffWindow; B: TariffWindow } | null;
+  sites: { site: string; A: TariffWindow; B: TariffWindow }[];
+  cheaperInWindowB: "agile" | "flat" | "equal" | null;
+  text: string;
+  evidence: string[];
+}
+
+const sideOf = (energyPence: number, standingPence: number): TariffSide => ({ energyGbp: gbp(energyPence), standingGbp: gbp(standingPence), totalGbp: gbp(energyPence + standingPence) });
+
+/** Same kWh, two tariffs, both windows. Agile = actual bill (energy inc VAT + contract standing charge); flat = flat unit rate + standing charge ex VAT with the contract's VAT rate applied. */
+export async function recommendTariff(ctx: HypCtx): Promise<TariffComparison> {
+  const vat = ctx.decomposition.vatRate;
+  const base = { scope: ctx.scope.label, historicalCounterfactual: true as const, notAdvice: TARIFF_NOT_ADVICE,
+    tariff: { productCode: FLAT_TARIFF.productCode, tariffCode: FLAT_TARIFF.tariffCode, name: FLAT_TARIFF.name, region: FLAT_TARIFF.region, why: FLAT_TARIFF.why, vatRate: vat, vatBasis: FLAT_TARIFF.vatNote } };
+  const none = (reason: string, evidence: string[] = []): TariffComparison => ({ ...base, ok: false, reason, windows: null, sites: [], cheaperInWindowB: null, text: `no tariff comparison: ${reason}`, evidence });
+  if (vat === null) return none("no VAT rate in the contract, so the two tariffs cannot be put on the same basis");
+  const f = await ctx.data.tariff({ sites: ctx.sites, windows: { A: ctx.windowA, B: ctx.windowB } }, fetchMeta(ctx, "REC-TARIFF", `Flat tariff vs Agile on the same kWh (${ctx.scope.label})`));
+  const standing = ctx.decomposition.standing;
+  const expected = { A: ctx.windowA.days * T.SLOTS_PER_DAY, B: ctx.windowB.days * T.SLOTS_PER_DAY };
+  const win = (rows: typeof f.rows, w: "A" | "B", nSites: number): TariffWindow | null => {
+    const rs = rows.filter((r) => r.win === w);
+    if (rs.length === 0) return null;
+    const slots = sum(rs.map((r) => r.nSlots)), days = slots / T.SLOTS_PER_DAY;
+    const agile = sideOf(sum(rs.map((r) => r.agileIncPence)), days * standing[w]);
+    const flat = sideOf(sum(rs.map((r) => r.flatExcPence)) * (1 + vat), sum(rs.map((r) => r.flatStandingExcPence)) * (1 + vat));
+    return {
+      win: w, slots, days, kwh: sum(rs.map((r) => r.kwh)), agile, flat, flatMinusAgileGbp: round(flat.totalGbp - agile.totalGbp, 2),
+      flatUnitRateRangeP: [Math.min(...rs.map((r) => r.flatRateMinExc)), Math.max(...rs.map((r) => r.flatRateMaxExc))],
+      coverageComplete: rs.length === nSites && rs.every((r) => r.nSlots === expected[w]),
+    };
+  };
+  const sites = ctx.sites.map((s) => ({ site: s, A: win(f.rows.filter((r) => r.site === s), "A", 1), B: win(f.rows.filter((r) => r.site === s), "B", 1) }));
+  if (sites.some((s) => !s.A || !s.B)) return none("a site has no half-hours with both an Agile price and a flat-tariff rate in one of the windows", [f.evidence.id]);
+  const okSites = sites as { site: string; A: TariffWindow; B: TariffWindow }[];
+  const total = (w: "A" | "B"): TariffWindow => {
+    const parts = okSites.map((s) => s[w]);
+    const addSide = (k: "agile" | "flat"): TariffSide => ({ energyGbp: round(sum(parts.map((p) => p[k].energyGbp)), 2), standingGbp: round(sum(parts.map((p) => p[k].standingGbp)), 2), totalGbp: round(sum(parts.map((p) => p[k].totalGbp)), 2) });
+    const agile = addSide("agile"), flat = addSide("flat");
+    return { win: w, slots: sum(parts.map((p) => p.slots)), days: parts[0].days, kwh: sum(parts.map((p) => p.kwh)), agile, flat, flatMinusAgileGbp: round(flat.totalGbp - agile.totalGbp, 2),
+      flatUnitRateRangeP: [Math.min(...parts.map((p) => p.flatUnitRateRangeP[0])), Math.max(...parts.map((p) => p.flatUnitRateRangeP[1]))], coverageComplete: parts.every((p) => p.coverageComplete) };
+  };
+  const windows = { A: total("A"), B: total("B") };
+  const cheaperInWindowB = windows.B.flatMinusAgileGbp > 0.005 ? "agile" : windows.B.flatMinusAgileGbp < -0.005 ? "flat" : "equal";
+  const m: Record<string, [number | string | boolean | null, string]> = { vat_rate: [vat, "ratio"] };
+  for (const w of ["A", "B"] as const) {
+    const x = windows[w];
+    m[`agile_total_${w}`] = [x.agile.totalGbp, "GBP"]; m[`flat_total_${w}`] = [x.flat.totalGbp, "GBP"]; m[`flat_minus_agile_${w}`] = [x.flatMinusAgileGbp, "GBP"];
+    m[`agile_energy_${w}`] = [x.agile.energyGbp, "GBP"]; m[`flat_energy_${w}`] = [x.flat.energyGbp, "GBP"]; m[`agile_standing_${w}`] = [x.agile.standingGbp, "GBP"]; m[`flat_standing_${w}`] = [x.flat.standingGbp, "GBP"];
+    m[`flat_unit_rate_min_ex_vat_${w}`] = [x.flatUnitRateRangeP[0], "p/kWh"]; m[`flat_unit_rate_max_ex_vat_${w}`] = [x.flatUnitRateRangeP[1], "p/kWh"]; m[`kwh_${w}`] = [x.kwh, "kWh"];
+  }
+  m.product_code = [FLAT_TARIFF.productCode, "code"]; m.coverage_complete = [windows.A.coverageComplete && windows.B.coverageComplete, "flag"];
+  ctx.evidence.addMetrics(f.evidence.id, metricMap(m));
+  const sentence = (w: "A" | "B") => { const x = windows[w]; return `${x.flatMinusAgileGbp >= 0 ? "£" + x.flatMinusAgileGbp.toFixed(2) + " more" : "£" + Math.abs(x.flatMinusAgileGbp).toFixed(2) + " less"} (£${x.flat.totalGbp.toFixed(2)} flat vs £${x.agile.totalGbp.toFixed(2)} Agile)`; };
+  const text = `Historical counterfactual, not advice: on the same kWh, the flat ${FLAT_TARIFF.name} tariff (${FLAT_TARIFF.productCode}, region ${FLAT_TARIFF.region}) would have cost ${sentence("B")} in window B and ${sentence("A")} in window A, energy plus standing charge, VAT at the contract rate (SAMPLE meter data).`
+    + (windows.A.coverageComplete && windows.B.coverageComplete ? "" : " Some half-hours had no flat rate or no Agile price and are left out of both sides.");
+  return { ...base, ok: true, windows, sites: okSites, cheaperInWindowB, text, evidence: [f.evidence.id] };
 }

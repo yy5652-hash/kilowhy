@@ -3,7 +3,7 @@
 //   every table reference is kilowhy.<allow-listed view> (or a CTE defined in the same statement); LIMIT appended or clamped to <= 5000.
 // A small lexer separates words, quoted identifiers, string literals and comments first, so literals and comments cannot fool the checks.
 export const MAX_LIMIT = 5000;
-export const ALLOWED_VIEWS: readonly string[] = ["agile_rates", "ci_london", "fuel_hh", "temp_hourly", "meter_hh", "sites", "ops_log", "contract", "agile_standing"];
+export const ALLOWED_VIEWS: readonly string[] = ["agile_rates", "ci_london", "fuel_hh", "temp_hourly", "meter_hh", "sites", "ops_log", "contract", "agile_standing", "flat_tariff"];
 export const SCHEMA = "kilowhy";
 const FORBIDDEN_KEYWORDS = new Set(["create", "drop", "insert", "update", "delete", "alter", "cache", "uncache", "grant", "revoke", "refresh", "set", "truncate", "merge", "use", "add", "load"]);
 // Extra hardening beyond the spec list: Spark functions that can run arbitrary JVM methods.

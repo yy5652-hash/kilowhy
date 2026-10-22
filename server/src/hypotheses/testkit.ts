@@ -1,7 +1,7 @@
 // Synthetic data layer for tests: no Zetaris, fully deterministic. NOT a test file (it is imported by the *.test.ts files).
 // All numbers are made up (maths tests), not meter data.
 import { addDays } from "../bands.ts";
-import type { ContractRow, CoverageRow, DailyRow, DataLayer, Fetched, FetchMeta, OpsEvent, QualityRow, SlotRow, Windows } from "../data.ts";
+import type { ContractRow, CoverageRow, DailyRow, DataLayer, Fetched, FetchMeta, OpsEvent, QualityRow, SlotRow, TariffRow, Windows } from "../data.ts";
 import { makeEvidence, type EvidenceSource, type Row } from "../evidence.ts";
 import { WINDOW_A, WINDOW_B, type DateWindow } from "../windows.ts";
 import { buildContext } from "./context.ts";
@@ -27,6 +27,8 @@ export interface SynthOpts {
   contract?: ContractRow[];
   drop?: (site: string, win: Win, day: number, slot: number) => boolean; // omit these meter rows
   qualityIssues?: QualityRow[];
+  /** flat comparison tariff: rate periods (UTC ISO bounds, `to` null = open), ex-VAT p/kWh and ex-VAT standing p/day; default one period at 30 p and 50 p/day */
+  flat?: { from: string; to: string | null; excP: number; standingExc: number }[];
   noise?: number;                                                     // relative noise on kWh, default 0.01
   seed?: number;
 }
@@ -88,6 +90,21 @@ export function synth(o: SynthOpts = {}): Synth {
       const summary: QualityRow[] = q.sites.map((s) => ({ check: "rows", site: s, start: "2026-08-27 00:00:00", end: "2026-10-21 23:30:00", n: rows.filter((r) => r.site === s).length, value: 0 }));
       const r = [...(o.qualityIssues ?? []).filter((i) => q.sites.includes(i.site)), ...summary];
       return wrap(meta, "quality", r, r as unknown as Row[], [{ view: "meter_hh", kind: "FILE: sample" }]);
+    },
+    async tariff(q, meta) {
+      const periods = o.flat ?? [{ from: "2026-05-31T23:00:00Z", to: null, excP: 30, standingExc: 50 }];
+      const out: TariffRow[] = [];
+      for (const site of q.sites) for (const win of ["A", "B"] as Win[]) {
+        const rs = rows.filter((r) => r.site === site && r.win === win);
+        let n = 0, kwh = 0, agile = 0, flat = 0, standing = 0, lo = Infinity, hi = -Infinity;
+        for (const r of rs) {
+          const t = Date.parse(r.ts), per = periods.find((p) => t >= Date.parse(p.from) && (p.to === null || t < Date.parse(p.to)));
+          if (!per) continue; // inner join: slots without a flat rate drop out, as in the Zetaris query
+          n++; kwh += r.kwh; agile += r.kwh * r.p; flat += r.kwh * per.excP; standing += per.standingExc / 48; lo = Math.min(lo, per.excP); hi = Math.max(hi, per.excP);
+        }
+        if (n) out.push({ site, win, nSlots: n, kwh, agileIncPence: agile, flatExcPence: flat, flatStandingExcPence: standing, flatRateMinExc: lo, flatRateMaxExc: hi });
+      }
+      return wrap(meta, "tariff", out, out as unknown as Row[], [{ view: "meter_hh", kind: "FILE: sample" }, { view: "agile_rates", kind: "REST: Octopus" }, { view: "flat_tariff", kind: "REST: Octopus" }]);
     },
     async coverage(q, meta) {
       const out: CoverageRow[] = [];

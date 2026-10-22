@@ -22,6 +22,14 @@ export interface OpsEvent { eventId: string; siteId: string; eventDate: string; 
 export interface ContractRow { src: "contract" | "agile_standing"; productCode: string | null; tariffCode: string | null; standingPencePerDay: number | null; vatRate: number | null; validFrom: string }
 export type QualityCheck = "zero_run" | "flatline" | "duplicate_ts" | "slots_per_day" | "rows";
 export interface QualityRow { check: QualityCheck; site: string; start: string; end: string; n: number; value: number | null }
+/** Per site and window: Agile cost (inc VAT) and the flat-tariff cost (ex VAT) of the same kWh, from one federated query over meter_hh, agile_rates and flat_tariff. */
+export interface TariffRow {
+  site: string; win: "A" | "B"; nSlots: number; kwh: number;
+  agileIncPence: number;               // sum(kwh * Agile p/kWh inc VAT): the actual energy bill
+  flatExcPence: number;                // sum(kwh * flat unit rate ex VAT) over the rate in force at each slot
+  flatStandingExcPence: number;        // sum over days of the flat standing charge ex VAT
+  flatRateMinExc: number; flatRateMaxExc: number;
+}
 export interface CoverageRow { site: string; win: "A" | "B"; nMeter: number; nPriced: number; nCarbon: number }
 
 export interface DataLayer {
@@ -32,6 +40,7 @@ export interface DataLayer {
   contract(meta: FetchMeta): Promise<Fetched<ContractRow>>;
   quality(q: { sites: string[]; windows: Windows }, meta: FetchMeta): Promise<Fetched<QualityRow>>;
   coverage(q: { sites: string[]; windows: Windows }, meta: FetchMeta): Promise<Fetched<CoverageRow>>;
+  tariff(q: { sites: string[]; windows: Windows }, meta: FetchMeta): Promise<Fetched<TariffRow>>;
 }
 
 // ---------------------------------------------------------------- SQL (vetted templates; identifiers are validated, never interpolated raw)
@@ -44,6 +53,7 @@ const SRC = {
   contract: { view: "contract", kind: "FILE: sample" },
   standing: { view: "agile_standing", kind: "REST: Octopus" },
   sites: { view: "sites", kind: "FILE: sample" },
+  flat: { view: "flat_tariff", kind: "REST: Octopus" },
 } as const satisfies Record<string, EvidenceSource>;
 
 const siteList = (sites: string[]): string => {
@@ -95,6 +105,13 @@ export const coverageSql = (sites: string[], w: Windows): string =>
   `FROM kilowhy.meter_hh m LEFT JOIN kilowhy.agile_rates r ON m.ts = r.slot_start LEFT JOIN kilowhy.ci_london c ON m.ts = c.slot_start\n` +
   `WHERE m.site_id IN (${siteList(sites)}) AND ${rangeSql("m.ts", w)}\nGROUP BY m.site_id, ${winSql("m.ts", w)} ORDER BY m.site_id, win`;
 
+/** Same kWh on two tariffs: the actual Agile energy cost and the flat tariff's energy and standing cost, per site and window (aggregated in Zetaris). */
+export const tariffSql = (sites: string[], w: Windows): string =>
+  `SELECT m.site_id, ${winSql("m.ts", w)} AS win, COUNT(*) AS n_slots, SUM(m.kwh) AS kwh, SUM(m.kwh * r.p_kwh_inc_vat) AS agile_inc_pence, SUM(m.kwh * f.p_kwh_exc_vat) AS flat_exc_pence, ` +
+  `SUM(f.standing_p_day_exc_vat) / 48.0 AS flat_standing_exc_pence, MIN(f.p_kwh_exc_vat) AS flat_rate_min_exc, MAX(f.p_kwh_exc_vat) AS flat_rate_max_exc\n` +
+  `FROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start JOIN kilowhy.flat_tariff f ON m.ts >= f.valid_from AND (f.valid_to IS NULL OR m.ts < f.valid_to)\n` +
+  `WHERE m.site_id IN (${siteList(sites)}) AND ${rangeSql("m.ts", w)}\nGROUP BY m.site_id, ${winSql("m.ts", w)} ORDER BY m.site_id, win`;
+
 // ---------------------------------------------------------------- row parsing
 const num = (v: unknown): number | null => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 const need = (v: unknown, what: string): number => { const x = num(v); if (x === null) throw new Error(`expected a number for ${what}, got ${JSON.stringify(v)}`); return x; };
@@ -112,6 +129,11 @@ export const parseContract = (r: Row): ContractRow => ({
 });
 export const parseQuality = (r: Row): QualityRow => ({ check: str(r.check_name) as QualityCheck, site: str(r.site_id), start: str(r.start_ts), end: str(r.end_ts), n: need(r.n, "n"), value: num(r.value) });
 export const parseCoverage = (r: Row): CoverageRow => ({ site: str(r.site_id), win: r.win === "A" ? "A" : "B", nMeter: need(r.n_meter, "n_meter"), nPriced: need(r.n_priced, "n_priced"), nCarbon: need(r.n_carbon, "n_carbon") });
+
+export const parseTariff = (r: Row): TariffRow => ({
+  site: str(r.site_id), win: r.win === "A" ? "A" : "B", nSlots: need(r.n_slots, "n_slots"), kwh: need(r.kwh, "kwh"), agileIncPence: need(r.agile_inc_pence, "agile_inc_pence"),
+  flatExcPence: need(r.flat_exc_pence, "flat_exc_pence"), flatStandingExcPence: need(r.flat_standing_exc_pence, "flat_standing_exc_pence"), flatRateMinExc: need(r.flat_rate_min_exc, "flat_rate_min_exc"), flatRateMaxExc: need(r.flat_rate_max_exc, "flat_rate_max_exc"),
+});
 
 // ---------------------------------------------------------------- Zetaris implementation
 interface QueryResult { sql: string; runId: string; rows: Row[] }
@@ -150,5 +172,6 @@ export function createZetarisData(zsql: ZSql): DataLayer {
     contract: (meta) => fetched(contractSql(), [SRC.contract, SRC.standing], parseContract, meta),
     quality: (q, meta) => fetched(qualitySql(q.sites, q.windows), [SRC.meter], parseQuality, meta),
     coverage: (q, meta) => fetched(coverageSql(q.sites, q.windows), [SRC.meter, SRC.rates, SRC.carbon], parseCoverage, meta),
+    tariff: (q, meta) => fetched(tariffSql(q.sites, q.windows), [SRC.meter, SRC.rates, SRC.flat], parseTariff, meta),
   };
 }

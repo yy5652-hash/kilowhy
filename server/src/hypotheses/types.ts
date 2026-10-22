@@ -45,6 +45,7 @@ export interface Decomp {
   windowB: DecWindow | null;
   aligned: Aligned;
   standing: { A: number; B: number };         // pence per day per site
+  vatRate: number | null;                     // from the contract row in force in window B (0.05 in the sample contract)
   evidenceId: string;                         // DECOMP evidence of the slot query
   contractEvidenceId: string;
   warnings: string[];

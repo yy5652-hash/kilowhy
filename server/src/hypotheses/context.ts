@@ -64,7 +64,7 @@ export async function buildContext(args: BuildArgs): Promise<HypCtx> {
   const wb = { slots: toDecompSlots(aligned.B, (x) => x.p), days: windowB.days, standingPencePerDay: standing.B * n };
   const r = decompose(wa, wb);
   const decomp: Decomp = {
-    ok: r.ok, error: r.ok ? undefined : r.message, result: r.ok ? r : null, windowA: wa, windowB: wb, aligned, standing,
+    ok: r.ok, error: r.ok ? undefined : r.message, result: r.ok ? r : null, windowA: wa, windowB: wb, aligned, standing, vatRate: cb.row?.vatRate ?? ca.row?.vatRate ?? null,
     evidenceId: slotsF.evidence.id, contractEvidenceId: contractF.evidence.id, warnings,
   };
   if (r.ok) {

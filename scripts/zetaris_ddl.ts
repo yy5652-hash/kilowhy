@@ -1,10 +1,13 @@
 // Generates and runs the Zetaris DDL for all Kilowhy sources, then flattened views.
-// Usage: node scripts/zetaris_ddl.ts [--views-only] [--dry]
+// Usage: node scripts/zetaris_ddl.ts [--views-only] [--flat-only] [--dry]
+//   --flat-only: only the flat-tariff comparison tables and kilowhy.flat_tariff (Octopus business variable tariff, see server/src/flat_tariff.ts)
 // REST sources are real public data (Octopus, NESO, Open-Meteo, Elexon). Files are SAMPLE meter data.
 import { zsql, sleep } from "./zetaris_client.ts";
+import { flatRatesEndpoint, flatStandingEndpoint, flatViewSql } from "../server/src/flat_tariff.ts";
 
 const DRY = process.argv.includes("--dry");
 const VIEWS_ONLY = process.argv.includes("--views-only");
+const FLAT_ONLY = process.argv.includes("--flat-only");
 const START = "2026-08-27"; // first day (UTC), 8 weeks ending 2026-10-21
 const END_EXCL = "2026-10-22";
 const addDays = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
@@ -32,6 +35,9 @@ for (const w of weeks()) {
   sources.push({ table: `fuelhh_${w.name}_raw`, sql: rest(`fuelhh_${w.name}_raw`, `https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELHH?settlementDateFrom=${w.from}&settlementDateTo=${addDays(w.to, -1)}&format=json`) });
 }
 
+sources.push({ table: "flat_rates_raw", sql: rest("flat_rates_raw", flatRatesEndpoint(START, END_EXCL)) });
+sources.push({ table: "flat_standing_raw", sql: rest("flat_standing_raw", flatStandingEndpoint(START, END_EXCL)) });
+
 const T = (t: string) => `KILOWHY_REST.${t}`;
 const ts = (c: string) => `to_timestamp(${c})`;
 const union = (parts: string[]) => parts.join("\nUNION ALL\n");
@@ -52,6 +58,7 @@ const views: { name: string; sql: string }[] = [
   { name: "sites", sql: `SELECT * FROM KILOWHY_FILES.sites_raw` },
   { name: "ops_log", sql: `SELECT event_id, site_id, CAST(event_date AS DATE) AS event_date, description FROM KILOWHY_FILES.ops_log_raw` },
   { name: "contract", sql: `SELECT * FROM KILOWHY_FILES.contract_raw` },
+  { name: "flat_tariff", sql: flatViewSql() },
 ];
 
 async function step(label: string, sql: string, wait = 0): Promise<boolean> {
@@ -63,17 +70,25 @@ async function step(label: string, sql: string, wait = 0): Promise<boolean> {
   return r.ok;
 }
 
-if (!VIEWS_ONLY) {
+if (!VIEWS_ONLY && !FLAT_ONLY) {
   await step("create db KILOWHY_REST", `CREATE LIGHTNING DATABASE KILOWHY_REST DESCRIBE BY "Kilowhy REST sources"`);
   await step("create db KILOWHY_FILES", `CREATE LIGHTNING DATABASE KILOWHY_FILES DESCRIBE BY "Kilowhy sample files"`);
   for (const f of ["meter_hh", "sites", "ops_log", "contract"]) {
     await step(`file ${f}`, `CREATE LIGHTNING FILESTORE TABLE ${f}_raw FROM KILOWHY_FILES FORMAT CSV OPTIONS (PATH "file:///home/zetaris/customer-data/shared/kw_${f}.csv", inferSchema "true", header "true")`);
     await step(`cache ${f}`, `CACHE TABLE KILOWHY_FILES.${f}_raw`);
   }
+}
+if (FLAT_ONLY) {
+  for (const s of sources.filter((x) => x.table.startsWith("flat_"))) {
+    await step(`rest ${s.table}`, s.sql, 15000);
+    await step(`cache ${s.table}`, `CACHE TABLE ${T(s.table)}`, 5000);
+  }
+}
+if (!VIEWS_ONLY && !FLAT_ONLY) {
   for (const s of sources) {
     await step(`rest ${s.table}`, s.sql, 15000);
     await step(`cache ${s.table}`, `CACHE TABLE ${T(s.table)}`, 5000);
   }
 }
-await step("container", `CREATE SCHEMASTORE CONTAINER kilowhy`);
-for (const v of views) await step(`view ${v.name}`, `CREATE OR REPLACE SCHEMASTORE VIEW ${v.name} WITH CONTAINER kilowhy AS\n${v.sql}`);
+if (!FLAT_ONLY) await step("container", `CREATE SCHEMASTORE CONTAINER kilowhy`);
+for (const v of FLAT_ONLY ? views.filter((x) => x.name === "flat_tariff") : views) await step(`view ${v.name}`, `CREATE OR REPLACE SCHEMASTORE VIEW ${v.name} WITH CONTAINER kilowhy AS\n${v.sql}`);

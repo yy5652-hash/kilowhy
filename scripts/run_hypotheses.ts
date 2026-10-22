@@ -7,7 +7,8 @@ import { zsql } from "./zetaris_client.ts";
 import { createZetarisData } from "../server/src/data.ts";
 import { buildContext, runAll, CATALOG, THRESHOLDS } from "../server/src/hypotheses/index.ts";
 import type { HypCtx, HypothesisId, HypothesisResult } from "../server/src/hypotheses/types.ts";
-import { recommend, type Recommendation } from "../server/src/recommend.ts";
+import { recommend, recommendTariff, TARIFF_NOT_ADVICE, type Recommendation, type TariffComparison } from "../server/src/recommend.ts";
+import { FLAT_TARIFF } from "../server/src/flat_tariff.ts";
 import { WINDOW_A, WINDOW_B } from "../server/src/windows.ts";
 import { addDays } from "../server/src/bands.ts";
 import { sum } from "../server/src/decompose.ts";
@@ -21,19 +22,20 @@ const scopes = [...siteIds.map((s) => ({ label: s, sites: [s] })), { label: "ALL
 const checks: { check: string; pass: boolean; detail?: string }[] = [];
 const check = (name: string, pass: boolean, detail?: string) => { checks.push({ check: name, pass, detail }); if (!pass) console.error(`CHECK FAIL: ${name} ${detail ?? ""}`); };
 
-interface ScopeRun { ctx: HypCtx; results: HypothesisResult[]; rec: Recommendation }
+interface ScopeRun { ctx: HypCtx; results: HypothesisResult[]; rec: Recommendation; tariff: TariffComparison }
 const runs = new Map<string, ScopeRun>();
 for (const sc of scopes) {
   process.stderr.write(`running ${sc.label} ...\n`);
   const ctx = await buildContext({ data, scope: sc, windowA: WINDOW_A, windowB: WINDOW_B });
   const results = await runAll(ctx);
   const rec = await recommend(ctx);
-  runs.set(sc.label, { ctx, results, rec });
+  const tariff = await recommendTariff(ctx);
+  runs.set(sc.label, { ctx, results, rec, tariff });
 }
 
 // ---- consistency checks against the earlier D2a run and internal identities
 const d2a = existsSync(new URL("../eval/decompose_d2.json", import.meta.url)) ? JSON.parse(readFileSync(new URL("../eval/decompose_d2.json", import.meta.url), "utf8")) : null;
-for (const [label, { ctx, results, rec }] of runs) {
+for (const [label, { ctx, results, rec, tariff }] of runs) {
   const r = ctx.decomposition.result;
   check(`${label} decomposition ok`, !!r, ctx.decomposition.error);
   if (r) {
@@ -49,6 +51,11 @@ for (const [label, { ctx, results, rec }] of runs) {
   check(`${label} every cited evidence id exists`, results.every((x) => x.evidence.every((id) => ctx.evidence.get(id))));
   check(`${label} evidence hashes are sha256`, ctx.evidence.list().every((e) => /^[0-9a-f]{64}$/.test(e.resultSha256) && e.zetarisRunId.length > 0));
   check(`${label} recommendation ok`, rec.ok, rec.reason);
+  check(`${label} tariff comparison ok`, tariff.ok, tariff.reason);
+  if (tariff.ok && r) {
+    check(`${label} tariff Agile energy = decomposition energy (A and B)`, Math.abs(tariff.windows!.A.agile.energyGbp - gbp(r.CA)) < 0.011 && Math.abs(tariff.windows!.B.agile.energyGbp - gbp(r.CB)) < 0.011, `${tariff.windows!.A.agile.energyGbp}/${tariff.windows!.B.agile.energyGbp} vs ${gbp(r.CA)}/${gbp(r.CB)}`);
+    check(`${label} tariff comparison covers every half-hour`, tariff.windows!.A.coverageComplete && tariff.windows!.B.coverageComplete);
+  }
 }
 const allR = runs.get("ALL")?.ctx.decomposition.result;
 if (allR) check("ALL dC = sum of site dC", Math.abs(allR.deltaTotal - sum(siteIds.map((s) => runs.get(s)!.ctx.decomposition.result!.deltaTotal))) < 1e-6);
@@ -81,7 +88,7 @@ for (const ev of siteIds.flatMap(opsFor)) {
 }
 
 // ---- output JSON
-const scopeOut = [...runs].map(([label, { ctx, results, rec }]) => {
+const scopeOut = [...runs].map(([label, { ctx, results, rec, tariff }]) => {
   const r = ctx.decomposition.result;
   return {
     scope: label, sites: ctx.sites, sample_meter_data: true,
@@ -91,7 +98,8 @@ const scopeOut = [...runs].map(([label, { ctx, results, rec }]) => {
       slots_aligned: ctx.decomposition.aligned.kept, warnings: ctx.decomposition.warnings, evidence: ctx.decomposition.evidenceId,
     } : { error: ctx.decomposition.error },
     hypotheses: results,
-    recommendation: rec,
+    recommendation: rec,                       // load shift (v1)
+    recommendation_tariff: tariff,             // flat business tariff vs actual Agile bill (v2), historical counterfactual
     evidence: ctx.evidence.toJSON(),
   };
 });
@@ -100,6 +108,7 @@ const report = {
   generated_at: new Date().toISOString(), note: NOTE,
   windows: { A: WINDOW_A, B: WINDOW_B },
   method: "Each evidence record is one federated Zetaris query (sql, run id, row count, sha256 of canonical JSON of all rows, <=10 sample rows, metrics). Records for different hypotheses may share a query/run id when they use the same rows. H4 step test uses weather- and weekday-adjusted daily kWh (pooled OLS, spec H3 design); the unadjusted t is reported too.",
+  tariff_counterfactual: { note: TARIFF_NOT_ADVICE, flat_tariff: FLAT_TARIFF, view: "kilowhy.flat_tariff (valid_from, valid_to, p_kwh_exc_vat, p_kwh_inc_vat, standing_p_day_exc_vat, standing_p_day)" },
   thresholds: THRESHOLDS, catalog: CATALOG,
   planted_events: planted,
   pass, checks, scopes: scopeOut,
@@ -137,6 +146,12 @@ for (const c of CATALOG) console.log(`${c.id} ${c.name}`.slice(0, w0 - 1).padEnd
 console.log("\nbill change dC (GBP): " + labels.map((l) => `${l} ${sg(runs.get(l)!.ctx.decomposition.result ? gbp(runs.get(l)!.ctx.decomposition.result!.deltaTotal) : NaN)}`).join("   "));
 console.log("\nRecommendation (counterfactual on window-B prices):");
 for (const [l, { rec }] of runs) console.log(`  ${l}: ${rec.text}`);
+console.log(`\nTariff counterfactual (v2; ${TARIFF_NOT_ADVICE}) flat tariff ${FLAT_TARIFF.productCode} vs actual Agile, same kWh, energy + standing, GBP:`);
+for (const [l, { tariff }] of runs) {
+  if (!tariff.ok) { console.log(`  ${l}: ${tariff.text}`); continue; }
+  const w = tariff.windows!;
+  console.log(`  ${l}: window B flat ${w.B.flat.totalGbp.toFixed(2)} vs Agile ${w.B.agile.totalGbp.toFixed(2)} (flat ${sg(w.B.flatMinusAgileGbp)}); window A flat ${w.A.flat.totalGbp.toFixed(2)} vs Agile ${w.A.agile.totalGbp.toFixed(2)} (flat ${sg(w.A.flatMinusAgileGbp)}); flat unit rate ex VAT ${w.B.flatUnitRateRangeP[0]}-${w.B.flatUnitRateRangeP[1]} p/kWh in B`);
+}
 console.log("\nPlanted sample events (reported as found, thresholds untouched):");
 for (const p of planted) {
   console.log(`  ${p.event}: H4 step ${p.h4_step_detected ? "DETECTED" : "not detected"} (adjusted t ${p.h4_t_adjusted === null ? "n/a" : p.h4_t_adjusted.toFixed(2)}, raw t ${p.h4_t_raw === null ? "n/a" : p.h4_t_raw.toFixed(2)}, ${p.h4_step_kwh_per_day === null ? "n/a" : p.h4_step_kwh_per_day.toFixed(2)} kWh/day); H4 status ${p.h4_status_for_site}; H6 top day ${p.h6_top_day_is_event_day ? "IS" : "is not"} the event day, status ${p.h6_status_for_site}; most unusual day ${p.h6_most_unusual_day} (z ${p.h6_most_unusual_day_z})${p.h6_most_unusual_day_is_event_day ? " = event day" : ""}; H5 ${p.h5_status_for_site}${p.h5_schedule_shift ? ` (${p.h5_schedule_shift.detected ? "schedule shift" : "sub-threshold schedule move"} ${p.h5_schedule_shift.band} ${p.h5_schedule_shift.delta_pp.toFixed(1)} pp from ${p.h5_schedule_shift.change_point}, ${p.h5_schedule_shift.near_this_event ? "matches this event" : "nearest event " + p.h5_schedule_shift.nearest_event})` : ""}; H11 ${p.h11_status_for_site} (max |z| ${p.h11_max_abs_z}${p.h11_flagged_on_event_day ? ", flagged on the event day" : ""})${p.h4_profile_shift ? `; intraday ${p.h4_profile_shift.band} share ${p.h4_profile_shift.pp.toFixed(1)} pp` : ""}`);
