@@ -1,0 +1,75 @@
+{
+  "checked_at": "2026-10-22T00:17:17.676Z",
+  "note": "meter kWh are SAMPLE data; Agile unit rates are real (Octopus AGILE-24-10-01 region C, inc VAT)",
+  "zetaris_run_id": "b3d42652-df69-4a34-98e1-386b74c5a3c2",
+  "sql": "SELECT m.site_id, CASE WHEN m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-09-24 00:00:00' THEN 'A' ELSE 'B' END AS win,\n  COUNT(*) AS n, SUM(m.kwh) AS kwh, SUM(m.kwh * r.p_kwh_inc_vat) AS pence\nFROM kilowhy.meter_hh m JOIN kilowhy.agile_rates r ON m.ts = r.slot_start\nWHERE m.ts >= timestamp '2026-08-27 00:00:00' AND m.ts < timestamp '2026-10-22 00:00:00'\nGROUP BY 1, 2 ORDER BY 1, 2",
+  "pass": true,
+  "rows": [
+    {
+      "site": "S1",
+      "window": "A",
+      "slots_zetaris": 1344,
+      "slots_independent": 1344,
+      "kwh_zetaris": 3060.182999999998,
+      "kwh_independent": 3060.183,
+      "cost_gbp_zetaris": 781.52,
+      "cost_gbp_independent": 781.52,
+      "match": true
+    },
+    {
+      "site": "S1",
+      "window": "B",
+      "slots_zetaris": 1344,
+      "slots_independent": 1344,
+      "kwh_zetaris": 3312.941000000001,
+      "kwh_independent": 3312.941,
+      "cost_gbp_zetaris": 920.48,
+      "cost_gbp_independent": 920.48,
+      "match": true
+    },
+    {
+      "site": "S2",
+      "window": "A",
+      "slots_zetaris": 1344,
+      "slots_independent": 1344,
+      "kwh_zetaris": 2593.898999999996,
+      "kwh_independent": 2593.899,
+      "cost_gbp_zetaris": 664.13,
+      "cost_gbp_independent": 664.13,
+      "match": true
+    },
+    {
+      "site": "S2",
+      "window": "B",
+      "slots_zetaris": 1344,
+      "slots_independent": 1344,
+      "kwh_zetaris": 2772.7910000000034,
+      "kwh_independent": 2772.791,
+      "cost_gbp_zetaris": 768.8,
+      "cost_gbp_independent": 768.8,
+      "match": true
+    },
+    {
+      "site": "S3",
+      "window": "A",
+      "slots_zetaris": 1344,
+      "slots_independent": 1344,
+      "kwh_zetaris": 2061.327999999998,
+      "kwh_independent": 2061.328,
+      "cost_gbp_zetaris": 524.77,
+      "cost_gbp_independent": 524.77,
+      "match": true
+    },
+    {
+      "site": "S3",
+      "window": "B",
+      "slots_zetaris": 1344,
+      "slots_independent": 1344,
+      "kwh_zetaris": 2226.3900000000003,
+      "kwh_independent": 2226.39,
+      "cost_gbp_zetaris": 621.06,
+      "cost_gbp_independent": 621.06,
+      "match": true
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "checked_at": "2026-10-22T00:10:58.794Z",
+  "base_url": "http://127.0.0.1:8088/v1",
+  "requested_model": "meterless/auto",
+  "http_status": 200,
+  "answering_model": "nvidia/nemotron-3-ultra-550b-a55b",
+  "latency_ms": 1658,
+  "reply": "The user wants me to reply with the single word \"ok\".</think>ok",
+  "error": null,
+  "route_headers": {}
+}
