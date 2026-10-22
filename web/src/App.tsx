@@ -11,7 +11,7 @@ import { EvidenceDrawer } from "./components/EvidenceDrawer";
 import { Header } from "./components/Header";
 import { HowAnswerMade } from "./components/HowAnswerMade";
 import { HowItWorks } from "./components/HowItWorks";
-import { MemoryPanel } from "./components/MemoryPanel";
+import { MemoryPanel, type MemoryFocus } from "./components/MemoryPanel";
 import { OfflineNotice } from "./components/OfflineNotice";
 import { QuestionBox } from "./components/QuestionBox";
 import { RecentAnswers } from "./components/RecentAnswers";
@@ -24,7 +24,6 @@ import {
   type TimelineState,
 } from "./components/Timeline";
 import { FIXTURES, matchFixture, sitesFromFixtures, SUGGESTED_QUESTIONS } from "./fixtures";
-import { recallSummaryLine } from "./format";
 import type {
   AnswerListItem,
   ApiStatus,
@@ -60,7 +59,8 @@ export default function App() {
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
 
   const [drawerId, setDrawerId] = useState<string | null>(null);
-  const [memoryFocus, setMemoryFocus] = useState<string | null>(null);
+  const [memoryFocus, setMemoryFocus] = useState<MemoryFocus | null>(null);
+  const focusMemory = useCallback((id: string) => setMemoryFocus({ id, n: Date.now() }), []);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -223,7 +223,6 @@ export default function App() {
   );
 
   const drawerEvidence = drawerId ? evidenceMap.get(drawerId) ?? null : null;
-  const recallLine = result ? recallSummaryLine(result) : null;
 
   return (
     <div className="app">
@@ -279,10 +278,10 @@ export default function App() {
 
         {result && (
           <>
-            <AnswerCard result={result} onEvidence={openEvidence} onMemory={setMemoryFocus} />
+            <AnswerCard result={result} onEvidence={openEvidence} onMemory={focusMemory} />
             <RuledOut items={result.answer.ruledOut} onEvidence={openEvidence} />
             <RecommendationCard result={result} onEvidence={openEvidence} />
-            <HowAnswerMade result={result} apiOnline={apiOnline} />
+            <HowAnswerMade result={result} apiOnline={apiOnline} onMemory={focusMemory} />
           </>
         )}
 
@@ -290,8 +289,9 @@ export default function App() {
           site={site}
           sites={sites}
           apiOnline={apiOnline}
-          focusId={memoryFocus}
-          recallLine={recallLine}
+          focus={memoryFocus}
+          recalledIds={result?.memory?.recalled.map((m) => m.id) ?? []}
+          refreshKey={result?.generatedAt}
         />
       </main>
 

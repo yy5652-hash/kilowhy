@@ -22,19 +22,58 @@ export function memoryIdFromChip(facts: Fact[], chip: string): string | null {
   return fact?.memory?.id ?? null;
 }
 
+/** Words that keep their own capitalisation when a shouted headline is lowered. */
+const KEEP_CASE: [RegExp, string | ((m: string) => string)][] = [
+  [/\bkwh\b/gi, "kWh"],
+  [/\bmwh\b/gi, "MWh"],
+  [/\bkgco2e\b/gi, "kgCO2e"],
+  [/\bco2e?\b/gi, (m) => (m.toLowerCase() === "co2e" ? "CO2e" : "CO2")],
+  [/\bgbp\b/gi, "GBP"],
+  [/\bagile\b/gi, "Agile"],
+  [/\bcrumb & co\b/gi, "Crumb & Co"],
+];
+
 /**
- * If the headline arrives in ALL CAPS, render sentence case.
- * Leaves mixed-case headlines untouched.
+ * If the headline arrives in ALL CAPS, render sentence case (first letter of each
+ * sentence capitalised, site names and units restored). Mixed-case headlines are
+ * returned untouched. Client-side only.
  */
-export function sentenceCaseHeadline(headline: string): string {
+export function sentenceCaseHeadline(headline: string, properNames: string[] = []): string {
   const t = headline.trim();
   if (!t) return headline;
   const letters = t.replace(/[^A-Za-z]/g, "");
   if (letters.length < 4) return headline;
   const upper = letters.replace(/[^A-Z]/g, "").length;
   if (upper / letters.length < 0.85) return headline;
-  const lower = t.toLowerCase();
-  return lower.replace(/(^\s*[a-z])|([.!?]\s+[a-z])/g, (m) => m.toUpperCase());
+  let out = t.toLowerCase().replace(/(^\s*[a-z])|([.!?]\s+[a-z])/g, (m) => m.toUpperCase());
+  for (const [re, rep] of KEEP_CASE) out = out.replace(re, rep as never);
+  for (const name of properNames) {
+    if (!name) continue;
+    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(`\\b${esc}\\b`, "gi"), name);
+  }
+  return out;
+}
+
+/** "Crumb & Co Brixton" -> "Brixton"; used for short site labels. */
+export function shortSiteName(name: string): string {
+  return name.replace(/^Crumb & Co\s+/, "");
+}
+
+/** Chunk label from the Markovian report -> short name plus the parenthetical detail. */
+export function chunkName(label: string): { name: string; detail: string } {
+  const m = label.match(/^([^(]+?)\s*(?:\((.*)\))?\s*$/);
+  const raw = (m?.[1] ?? label).trim();
+  const name = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : label;
+  return { name, detail: (m?.[2] ?? "").trim() };
+}
+
+/** "nvidia-direct: nvidia/nemotron-3.5-lightning-30b-a3b" -> { fallback: true, model: "nemotron-3.5-lightning-30b-a3b" } */
+export function parseChunkRoute(route: string | null): { fallback: boolean; model: string } | null {
+  if (!route) return null;
+  const [prov, ...rest] = route.split(":");
+  const model = rest.join(":").trim().replace(/^nvidia\//, "");
+  return { fallback: prov.trim() === "nvidia-direct", model };
 }
 
 export function shortSha(sha: string, n = 10): string {
@@ -86,7 +125,9 @@ export function stepLabel(step: string): string {
     template: "Template answer",
     memory: "H-MEM",
   };
-  return map[step] ?? step;
+  if (map[step]) return map[step];
+  const { name, detail } = chunkName(step);
+  return detail ? `${name} (${detail})` : name;
 }
 
 const SITE_NAMES: Record<string, string> = {

@@ -1,85 +1,113 @@
 import { useEffect, useState } from "react";
 import { fetchEntities } from "../api/client";
-import type { EntityCounts, InvestigationResult, MarkovianChunk } from "../types";
-import { recallSummaryLine, stepLabel } from "../format";
+import type { EntityCounts, InvestigationResult, MarkovianReport } from "../types";
+import { chunkName, parseChunkRoute, recallSummaryLine, shortSiteName, stepLabel } from "../format";
 import { LlmReceipt } from "./LlmReceipt";
 
 interface Props {
   result: InvestigationResult;
   apiOnline: boolean;
+  onMemory?: (memoryId: string) => void;
 }
 
-function tokenBarValue(c: MarkovianChunk): { actual: number; naive: number; actualSource: string } {
-  const actual = c.inputTokens.measured ?? c.inputTokens.estimated;
-  const actualSource = c.inputTokens.measured != null ? "measured" : "estimated";
-  return { actual, naive: c.naiveInputTokens, actualSource };
+function siteName(result: InvestigationResult, id: string): string {
+  return result.scope.sites.find((s) => s.id === id)?.name ?? id;
 }
 
-function MarkovianChart({ chunks }: { chunks: MarkovianChunk[] }) {
+function fmt(n: number): string {
+  return n.toLocaleString("en-GB");
+}
+
+function pct(v: number, max: number): string {
+  if (v <= 0) return "2px";
+  return `${Math.max((v / max) * 100, 1.5).toFixed(2)}%`;
+}
+
+function MarkovianChart({ report }: { report: MarkovianReport }) {
+  const { chunks, totals } = report;
   if (chunks.length === 0) return <p className="muted small">No Markovian chunks recorded.</p>;
 
-  const rows = chunks.map((c) => ({ ...c, ...tokenBarValue(c) }));
-  const max = Math.max(...rows.flatMap((r) => [r.actual, r.naive]), 1);
-  const W = 560;
-  const rowH = 36;
-  const padL = 120;
-  const padR = 16;
-  const barMax = W - padL - padR;
-  const H = rows.length * rowH + 28;
+  // Both series are estimates (ceil(chars / 4)) so they compare like for like;
+  // provider-reported counts are shown as a separate, measured detail line.
+  const rows = chunks.map((c) => ({
+    c,
+    ...chunkName(c.label),
+    route: parseChunkRoute(c.route),
+    chain: c.inputTokens.estimated,
+    naive: c.naiveInputTokens,
+    measured: c.inputTokens.measured,
+  }));
+  const max = Math.max(...rows.flatMap((r) => [r.chain, r.naive]), 1);
+  const chainTotal = totals?.markovianInputEstimated ?? rows.reduce((a, r) => a + r.chain, 0);
+  const naiveTotal = totals?.naiveInputEstimated ?? rows.reduce((a, r) => a + r.naive, 0);
+  const less =
+    totals?.savedPercentEstimated ??
+    (naiveTotal > 0 ? Math.round((1 - chainTotal / naiveTotal) * 100) : 0);
+  const hasMeasured = rows.some((r) => r.measured != null);
 
   return (
     <figure className="markov-chart">
-      <figcaption>
-        Input tokens per chunk vs naive full-history estimate (estimates labelled)
+      <figcaption className="markov-summary">
+        Chain total ≈ <strong>{fmt(chainTotal)}</strong> tokens vs ≈ <strong>{fmt(naiveTotal)}</strong>{" "}
+        naive{less > 0 ? ` (${less}% less)` : ""}, estimated
       </figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Markovian token comparison">
-        {rows.map((r, i) => {
-          const y = 8 + i * rowH;
-          const aw = (r.actual / max) * barMax;
-          const nw = (r.naive / max) * barMax;
-          const label = r.label.length > 22 ? `${r.label.slice(0, 20)}…` : r.label;
-          return (
-            <g key={r.id}>
-              <text x={padL - 8} y={y + 14} textAnchor="end" className="markov-label">
-                {label}
-              </text>
-              <rect
-                x={padL}
-                y={y}
-                width={Math.max(nw, 1)}
-                height={10}
-                rx={2}
-                className="markov-naive"
-              />
-              <text x={padL + nw + 4} y={y + 9} className="markov-num">
-                {r.naive} est.
-              </text>
-              <rect
-                x={padL}
-                y={y + 14}
-                width={Math.max(aw, 1)}
-                height={10}
-                rx={2}
-                className="markov-actual"
-              />
-              <text x={padL + aw + 4} y={y + 23} className="markov-num">
-                {r.actual}
-                {r.actualSource === "estimated" ? " est." : ""}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      <p className="markov-legend muted small">
-        <span className="swatch naive" /> naive full-history (estimated)
-        <span className="swatch actual" /> chunk input
-        {rows.some((r) => r.actualSource === "estimated") && " (est. when not measured)"}
+      <ul className="markov-legend" aria-label="Legend">
+        <li>
+          <span className="swatch chain" aria-hidden /> Chain: input sent to each step
+        </li>
+        <li>
+          <span className="swatch naive" aria-hidden /> Naive: full history re-sent each step
+        </li>
+      </ul>
+      <ol className="markov-rows">
+        {rows.map((r) => (
+          <li key={r.c.id} className="markov-row">
+            <div className="markov-name">
+              <strong>{r.name}</strong>
+              {r.detail && <span className="markov-detail">{r.detail}</span>}
+            </div>
+            <div className="markov-bars">
+              <div className="markov-bar-row">
+                <span className="markov-track">
+                  <span className="markov-bar chain" style={{ width: pct(r.chain, max) }} />
+                </span>
+                <span className="markov-val">
+                  {fmt(r.chain)} {r.chain > 0 && <span className="est">est.</span>}
+                </span>
+              </div>
+              <div className="markov-bar-row">
+                <span className="markov-track">
+                  <span className="markov-bar naive" style={{ width: pct(r.naive, max) }} />
+                </span>
+                <span className="markov-val">
+                  {fmt(r.naive)} {r.naive > 0 && <span className="est">est.</span>}
+                </span>
+              </div>
+            </div>
+            {(r.route || r.measured != null) && (
+              <p className="markov-meta">
+                {r.route && (
+                  <span className={`route-badge ${r.route.fallback ? "fallback" : "nightshift"}`}>
+                    {r.route.fallback ? "NVIDIA direct · fallback" : "Nightshift"}
+                  </span>
+                )}
+                {r.route && <span className="mono">{r.route.model}</span>}
+                {r.measured != null && <span>provider-reported input {fmt(r.measured)}</span>}
+              </p>
+            )}
+          </li>
+        ))}
+      </ol>
+      <p className="markov-foot muted small">
+        Estimated = characters ÷ 4 of what each step sends; the naive series re-sends every earlier
+        prompt and reply.
+        {hasMeasured && " Provider-reported (measured) input counts are listed under the steps that have them."}
       </p>
     </figure>
   );
 }
 
-export function HowAnswerMade({ result, apiOnline }: Props) {
+export function HowAnswerMade({ result, apiOnline, onMemory }: Props) {
   const [counts, setCounts] = useState<EntityCounts | null>(null);
   const [entityError, setEntityError] = useState<string | null>(null);
 
@@ -113,6 +141,8 @@ export function HowAnswerMade({ result, apiOnline }: Props) {
   const timingEntries = Object.entries(result.timings)
     .filter(([k]) => k !== "total")
     .sort((a, b) => b[1] - a[1]);
+  const maxMs = Math.max(...timingEntries.map(([, ms]) => ms), 1);
+  const writtenCount = result.memory?.written.filter((w) => !w.skipped).length ?? 0;
 
   return (
     <section className="how-answer" aria-label="How this answer was made">
@@ -125,7 +155,7 @@ export function HowAnswerMade({ result, apiOnline }: Props) {
             Engine {result.markovian.engine} · status {result.markovian.status}
             {result.engine && result.engine !== "markovian" && ` · result engine ${result.engine}`}
           </p>
-          <MarkovianChart chunks={result.markovian.chunks} />
+          <MarkovianChart report={result.markovian} />
         </div>
       )}
 
@@ -142,13 +172,28 @@ export function HowAnswerMade({ result, apiOnline }: Props) {
           <ul className="recall-list">
             {result.memory.recalled.map((m) => (
               <li key={m.id}>
-                <span className="origin-badge">{m.origin === "user" ? "your note" : "agent finding"}</span>
-                <span className="mono">{m.factId}</span>
-                <span className="muted small">{m.site ?? "all sites"}</span>
-                <span>{m.text.length > 120 ? `${m.text.slice(0, 118)}…` : m.text}</span>
+                <span className={`origin-badge ${m.origin}`}>
+                  {m.origin === "user" ? "your note" : "agent finding"}
+                </span>
+                <button
+                  type="button"
+                  className="cite cite-m"
+                  onClick={() => onMemory?.(m.id)}
+                  title="Open this memory"
+                >
+                  {m.factId}
+                </button>
+                <span className="muted small">{m.site ? shortSiteName(siteName(result, m.site)) : "all sites"}</span>
+                <span className="recall-text">{m.text}</span>
               </li>
             ))}
           </ul>
+        )}
+        {writtenCount > 0 && (
+          <p className="muted small">
+            Wrote {writtenCount} new finding{writtenCount === 1 ? "" : "s"} to memory after verifying
+            this answer.
+          </p>
         )}
         {result.memory?.embedRoute && (
           <p className="muted small">Embed route: {result.memory.embedRoute}</p>
@@ -183,13 +228,17 @@ export function HowAnswerMade({ result, apiOnline }: Props) {
         <ul className="timing-list">
           {timingEntries.map(([step, ms]) => (
             <li key={step}>
-              <span>{stepLabel(step)}</span>
+              <span className="timing-name">{stepLabel(step)}</span>
+              <span className="timing-track" aria-hidden>
+                <span className="timing-bar" style={{ width: pct(ms, maxMs) }} />
+              </span>
               <span className="mono">{(ms / 1000).toFixed(1)} s</span>
             </li>
           ))}
           {result.timings.total != null && (
             <li className="timing-total">
-              <span>Total</span>
+              <span className="timing-name">Total</span>
+              <span />
               <span className="mono">{(result.timings.total / 1000).toFixed(1)} s</span>
             </li>
           )}

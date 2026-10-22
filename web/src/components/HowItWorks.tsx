@@ -82,8 +82,32 @@ export function HowItWorks() {
           Nemotron
         </text>
       </svg>
+      <ol className="pipeline-steps" aria-label="Data flow from sources through Zetaris and Kilowhy to Nemotron">
+        <li>
+          <strong>Sources</strong>
+          <span>Octopus Agile · NESO · Elexon · Open-Meteo · sample meters</span>
+        </li>
+        <li className="accent">
+          <strong>Zetaris</strong>
+          <span>one SQL endpoint</span>
+        </li>
+        <li>
+          <strong>Kilowhy agent</strong>
+          <span>decompose · 11 hypotheses · verifier</span>
+          <span className="muted">Meterless engines: H-MEM · World Model · Markovian</span>
+        </li>
+        <li className="accent">
+          <strong>Meterless Nightshift</strong>
+          <span>primary route, with a compute receipt per call</span>
+        </li>
+        <li>
+          <strong>Nemotron</strong>
+          <span>NVIDIA direct fallback, always labelled</span>
+        </li>
+      </ol>
       <p className="built-with">
-        Built with Cursor — see <code>docs/cursor-log</code>
+        Built with Cursor CLI (data generator, UI) and Claude Code (server, evaluation, UI polish) — see{" "}
+        <code>docs/how-it-was-built.md</code>
       </p>
     </footer>
   );

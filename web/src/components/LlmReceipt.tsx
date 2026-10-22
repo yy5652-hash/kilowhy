@@ -1,49 +1,100 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { LlmCall } from "../types";
-import { formatRoute, stepLabel } from "../format";
+import { stepLabel } from "../format";
 
 interface Props {
   call: LlmCall;
-  /** Compact one-line summary always visible; expand for Nightshift receipt fields. */
+  /** The compact one-line summary is always visible; expand for the Nightshift receipt fields. */
   defaultOpen?: boolean;
+}
+
+function secs(ms: number): string {
+  return `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`;
+}
+
+function num(n: number): string {
+  return n.toLocaleString("en-GB");
 }
 
 export function LlmReceipt({ call, defaultOpen = false }: Props) {
   const [open, setOpen] = useState(defaultOpen);
+  const panelId = useId();
   const route = call.route;
   const isFallback = route?.provider === "nvidia-direct";
-  const canExpand = !!route;
+  const usage = route?.usage;
+  const hasUsage = usage != null && (usage.inputTokens != null || usage.outputTokens != null);
+  const totalTok =
+    usage?.totalTokens ?? (hasUsage ? (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0) : null);
 
   return (
-    <div className={`llm-receipt ${isFallback ? "fallback" : ""}`}>
+    <div className={`llm-receipt ${isFallback ? "fallback" : ""} ${open ? "open" : ""}`}>
       <button
         type="button"
         className="llm-receipt-toggle"
         aria-expanded={open}
-        disabled={!canExpand}
-        onClick={() => canExpand && setOpen((v) => !v)}
+        aria-controls={panelId}
+        disabled={!route}
+        onClick={() => route && setOpen((v) => !v)}
       >
         <span className="llm-step">{stepLabel(call.step)}</span>
         {route ? (
-          <span className="llm-route">
-            {formatRoute(route)}
-            {isFallback && <span className="fallback-tag"> NVIDIA-direct fallback</span>}
-          </span>
+          <>
+            <span className={`route-badge ${isFallback ? "fallback" : "nightshift"}`}>
+              {isFallback ? "NVIDIA direct · fallback" : "Nightshift receipt"}
+            </span>
+            <span className="llm-route">
+              {route.label ?? route.routedModel ?? "Nemotron"}
+              <span className="llm-sep"> · </span>
+              {secs(route.latencyMs)}
+              {totalTok != null && (
+                <>
+                  <span className="llm-sep"> · </span>
+                  {num(totalTok)} tok
+                </>
+              )}
+              {!isFallback && route.raceWidth != null && route.raceWidth > 1 && (
+                <>
+                  <span className="llm-sep"> · </span>race of {route.raceWidth}
+                </>
+              )}
+              {route.fromCache && (
+                <>
+                  <span className="llm-sep"> · </span>cached
+                </>
+              )}
+            </span>
+          </>
         ) : (
-          <span className="llm-route error">{call.error ?? "no route"}</span>
+          <span className="llm-route error">{call.error ?? "no route reported"}</span>
         )}
-        {canExpand && <span className="llm-chevron" aria-hidden>{open ? "▾" : "▸"}</span>}
+        {route && (
+          <span className="llm-chevron" aria-hidden>
+            {open ? "▾" : "▸"}
+          </span>
+        )}
       </button>
 
       {open && route && (
-        <dl className="receipt-fields">
+        <dl className="receipt-fields" id={panelId}>
           <div>
             <dt>Receipt id</dt>
             <dd>
-              {route.receiptId ?? (
+              {route.receiptId ? (
+                <code>{route.receiptId}</code>
+              ) : (
                 <span className="muted">
-                  none{isFallback ? " (NVIDIA-direct fallback — no Nightshift receipt)" : ""}
+                  none{isFallback ? " (a NVIDIA-direct fallback has no Nightshift receipt)" : ""}
                 </span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Route</dt>
+            <dd>
+              {isFallback ? (
+                <span className="fallback-tag">NVIDIA direct (fallback)</span>
+              ) : (
+                <span className="nightshift-tag">Meterless Nightshift</span>
               )}
             </dd>
           </div>
@@ -51,22 +102,20 @@ export function LlmReceipt({ call, defaultOpen = false }: Props) {
             <dt>Requested → routed</dt>
             <dd>
               <code>{route.requestedModel}</code>
-              {" → "}
+              <span className="arrow"> → </span>
               <code>{route.routedModel ?? "—"}</code>
             </dd>
           </div>
           <div>
             <dt>Label</dt>
-            <dd>
-              {route.label ?? "—"}
-              {isFallback && (
-                <span className="fallback-tag"> · NVIDIA-direct fallback</span>
-              )}
-            </dd>
+            <dd>{route.label ?? "—"}</dd>
           </div>
           <div>
             <dt>Tier</dt>
-            <dd>{route.tier ?? "—"}</dd>
+            <dd>
+              {route.tier ?? "—"}
+              {route.kind && <span className="muted"> ({route.kind})</span>}
+            </dd>
           </div>
           <div>
             <dt>Race width</dt>
@@ -75,22 +124,24 @@ export function LlmReceipt({ call, defaultOpen = false }: Props) {
           <div>
             <dt>Latency</dt>
             <dd>
-              {(route.latencyMs / 1000).toFixed(2)} s
-              {call.wallMs != null && call.wallMs !== route.latencyMs && (
-                <span className="muted"> (wall {(call.wallMs / 1000).toFixed(2)} s)</span>
+              {secs(route.latencyMs)}
+              {call.wallMs != null && Math.abs(call.wallMs - route.latencyMs) > 50 && (
+                <span className="muted"> (wall {secs(call.wallMs)})</span>
+              )}
+              {usage?.routerLatencyMs != null && (
+                <span className="muted"> · router {secs(usage.routerLatencyMs)}</span>
               )}
             </dd>
           </div>
           <div>
             <dt>Token usage</dt>
             <dd>
-              {route.usage.inputTokens != null || route.usage.outputTokens != null ? (
+              {hasUsage ? (
                 <>
-                  in {route.usage.inputTokens ?? "—"} · out {route.usage.outputTokens ?? "—"}
-                  {route.usage.totalTokens != null && <> · total {route.usage.totalTokens}</>}
-                  {route.usage.outputTps != null && (
-                    <> · {route.usage.outputTps.toFixed(1)} tok/s</>
-                  )}
+                  in {usage?.inputTokens != null ? num(usage.inputTokens) : "—"} · out{" "}
+                  {usage?.outputTokens != null ? num(usage.outputTokens) : "—"}
+                  {totalTok != null && <> · total {num(totalTok)}</>}
+                  {usage?.outputTps != null && <> · {usage.outputTps.toFixed(1)} tok/s</>}
                 </>
               ) : (
                 <span className="muted">not reported</span>
@@ -106,7 +157,7 @@ export function LlmReceipt({ call, defaultOpen = false }: Props) {
           {route.fromCache && (
             <div>
               <dt>Cache</dt>
-              <dd>answered from Nightshift response cache</dd>
+              <dd>answered from the Nightshift response cache</dd>
             </div>
           )}
         </dl>

@@ -47,7 +47,7 @@ export function CitedText({ text, facts, onEvidence, onMemory }: Props) {
           type="button"
           className="cite cite-m"
           onClick={() => onMemory?.(id)}
-          title={`Memory ${id}`}
+          title={`Open memory ${id}`}
         >
           {id}
         </button>,
@@ -81,12 +81,14 @@ export function SentenceWithCites({
   const present = new Set<string>();
   for (const m of text.matchAll(/\[?([EFM]\d+)\]?/g)) present.add(m[1]);
   const extraE = evidenceIds.filter((id) => !present.has(id));
-  const extraF = factIds.filter((id) => !present.has(id)).slice(0, 6);
+  const extraAll = factIds.filter((id) => !present.has(id));
+  const extraM = extraAll.filter((id) => id.startsWith("M"));
+  const extraF = extraAll.filter((id) => !id.startsWith("M")).slice(0, 6);
 
   return (
     <p className="sentence">
       <CitedText text={text} facts={facts} onEvidence={onEvidence} onMemory={onMemory} />
-      {(extraE.length > 0 || extraF.length > 0) && (
+      {(extraE.length > 0 || extraF.length > 0 || extraM.length > 0) && (
         <span className="cite-trail">
           {extraE.map((id) => (
             <button
@@ -95,6 +97,17 @@ export function SentenceWithCites({
               className="cite cite-e"
               onClick={() => onEvidence(id)}
               title={`Open evidence ${id}`}
+            >
+              {id}
+            </button>
+          ))}
+          {extraM.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className="cite cite-m"
+              onClick={() => onMemory?.(id)}
+              title={`Open memory ${id}`}
             >
               {id}
             </button>

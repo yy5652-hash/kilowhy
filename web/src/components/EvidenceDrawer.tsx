@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Evidence } from "../types";
 import { shortSha, sourceBadges } from "../format";
 
@@ -10,6 +10,19 @@ interface Props {
 
 export function EvidenceDrawer({ evidence, open, onClose }: Props) {
   const [copied, setCopied] = useState(false);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  const returnTo = useRef<HTMLElement | null>(null);
+
+  // Move focus into the drawer when it opens and give it back to the chip that opened it.
+  useEffect(() => {
+    if (open) {
+      returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const t = window.setTimeout(() => closeRef.current?.focus({ preventScroll: true }), 30);
+      return () => window.clearTimeout(t);
+    }
+    returnTo.current?.focus({ preventScroll: true });
+    returnTo.current = null;
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +58,7 @@ export function EvidenceDrawer({ evidence, open, onClose }: Props) {
       <aside
         className={`evidence-drawer ${open ? "open" : ""}`}
         aria-hidden={!open}
+        role="dialog"
         aria-label="Evidence detail"
       >
         {evidence && (
@@ -54,7 +68,13 @@ export function EvidenceDrawer({ evidence, open, onClose }: Props) {
                 <p className="drawer-id">{evidence.id}</p>
                 <h2>{evidence.title}</h2>
               </div>
-              <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+              <button
+                type="button"
+                className="icon-btn"
+                ref={closeRef}
+                onClick={onClose}
+                aria-label="Close evidence"
+              >
                 ×
               </button>
             </header>

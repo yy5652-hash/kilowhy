@@ -1,5 +1,5 @@
 import type { InvestigationResult } from "../types";
-import { memoryIdFromChip, recallSummaryLine, sentenceCaseHeadline } from "../format";
+import { memoryIdFromChip, recallSummaryLine, sentenceCaseHeadline, shortSiteName } from "../format";
 import { SentenceWithCites } from "./CitedText";
 import { Waterfall } from "./Waterfall";
 
@@ -14,6 +14,10 @@ export function AnswerCard({ result, onEvidence, onMemory }: Props) {
   const verified = verification.passed && verification.mode === "llm";
   const template = verification.mode === "template";
   const recallLine = recallSummaryLine(result);
+  const headline = sentenceCaseHeadline(
+    answer.headline,
+    result.scope.sites.map((x) => shortSiteName(x.name)),
+  );
 
   const openMemory = (chip: string) => {
     const id = memoryIdFromChip(facts, chip);
@@ -23,7 +27,7 @@ export function AnswerCard({ result, onEvidence, onMemory }: Props) {
   return (
     <section className="answer-card" aria-label="Answer">
       <div className="answer-head">
-        <h2>{sentenceCaseHeadline(answer.headline)}</h2>
+        <h2 className={`headline ${headline.length > 110 ? "long" : ""}`}>{headline}</h2>
         {verified && (
           <span className="verify-badge ok">Verified: every figure matches its source</span>
         )}
@@ -33,7 +37,22 @@ export function AnswerCard({ result, onEvidence, onMemory }: Props) {
         )}
       </div>
 
-      {recallLine && <p className="recall-banner">{recallLine}</p>}
+      {recallLine && (
+        <p className="recall-banner">
+          <span>{recallLine}</span>
+          {result.memory?.recalled.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="cite cite-m"
+              onClick={() => onMemory?.(m.id)}
+              title={`Open memory ${m.factId}: ${m.text}`}
+            >
+              {m.factId}
+            </button>
+          ))}
+        </p>
+      )}
 
       <Waterfall decomposition={decomposition} facts={facts} />
 

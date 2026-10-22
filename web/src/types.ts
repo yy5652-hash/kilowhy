@@ -268,13 +268,22 @@ export interface MarkovianChunk {
   note?: string;
 }
 
+export interface MarkovianTotals {
+  label?: string;
+  markovianInputEstimated?: number;
+  naiveInputEstimated?: number;
+  savedEstimated?: number;
+  savedPercentEstimated?: number;
+  markovianInputMeasured?: number | null;
+  plainLoopInputEstimated?: number;
+}
 export interface MarkovianReport {
   engine: "markovian";
   reference: string;
   config: { chunkSize: number; maxChunks: number; carryoverTokens: number; batchSize: number };
   status: string;
   chunks: MarkovianChunk[];
-  totals?: unknown;
+  totals?: MarkovianTotals;
   finalState?: unknown;
   carryoverShrunk?: string[];
   notes?: string[];

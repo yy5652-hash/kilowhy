@@ -1,3 +1,5 @@
+import { sentenceCaseHeadline } from "../format";
+
 interface AnswerMeta {
   slug: string;
   question: string;
@@ -28,10 +30,17 @@ export function RecentAnswers({ answers, busy, onOpen, activeSlug }: Props) {
               onClick={() => onOpen(a.slug)}
             >
               <span className="recent-q">{a.question}</span>
-              {a.headline && <span className="recent-h muted small">{a.headline}</span>}
+              {a.headline && (
+                <span className="recent-h muted small">{sentenceCaseHeadline(a.headline)}</span>
+              )}
               {a.generatedAt && (
                 <time className="muted small" dateTime={a.generatedAt}>
-                  {new Date(a.generatedAt).toLocaleString()}
+                  {new Date(a.generatedAt).toLocaleString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </time>
               )}
             </button>

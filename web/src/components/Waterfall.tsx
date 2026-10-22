@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { Fact, DecompositionSummary } from "../types";
 import { factDisplay } from "../format";
 
@@ -42,7 +43,48 @@ function AxisBreak({ x, y, w }: { x: number; y: number; w: number }) {
   );
 }
 
+/** Same mark for the horizontal layout (baseline on the left edge of the bar). */
+function AxisBreakH({ x, y, h }: { x: number; y: number; h: number }) {
+  const mid = y + h / 2;
+  const d = `M ${x - 5} ${mid + 7} L ${x + 5} ${mid + 2} M ${x - 5} ${mid + 2} L ${x + 5} ${mid - 3}`;
+  return (
+    <g className="wf-break" aria-hidden>
+      <path d={d} fill="none" stroke="var(--bg)" strokeWidth={4} strokeLinecap="round" />
+      <path d={d} fill="none" stroke="var(--ink-muted)" strokeWidth={1.4} strokeLinecap="round" />
+    </g>
+  );
+}
+
+const SHORT_LABEL: Record<string, string> = {
+  "Weather volume": "Weather",
+  "Operational volume": "Operations",
+};
+
+function wrapLabel(label: string): string[] {
+  const parts = label.split(" ");
+  if (parts.length < 2 || label.length <= 10) return [label];
+  return [parts[0], parts.slice(1).join(" ")];
+}
+
+/** Width of the container, so the chart is drawn in real pixels and its text never shrinks. */
+function useWidth(): [React.RefObject<HTMLElement>, number] {
+  const ref = useRef<HTMLElement>(null);
+  const [w, setW] = useState(640);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const cw = Math.round(entries[0].contentRect.width);
+      if (cw > 0) setW(cw);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w];
+}
+
 export function Waterfall({ decomposition, facts }: Props) {
+  const [ref, width] = useWidth();
   const r = decomposition.result;
   if (!r) return null;
 
@@ -108,15 +150,8 @@ export function Waterfall({ decomposition, facts }: Props) {
     { key: "B", label: "Window B", display: billB, gbp: penceToGbp(r.totalB), kind: "total" },
   ];
 
-  const W = 640;
-  const H = 240;
-  const padL = 8;
-  const padR = 8;
-  const padT = 28;
-  const padB = 48;
-  const gap = 10;
+  const narrow = width < 560;
   const n = bars.length;
-  const barW = (W - padL - padR - gap * (n - 1)) / n;
 
   // Running level for floating bars (bridge chart)
   let level = 0;
@@ -141,39 +176,48 @@ export function Waterfall({ decomposition, facts }: Props) {
   const maxY = Math.max(...tops, floor + 1) * 1.04;
   const minY = floor;
   const span = maxY - minY || 1;
-  const yScale = (v: number) => padT + ((maxY - Math.max(v, minY)) / span) * (H - padT - padB);
-  const hScale = (from: number, to: number) =>
-    Math.max(0, ((Math.min(to, maxY) - Math.max(from, minY)) / span) * (H - padT - padB));
+  const axisStart = `£${(Math.floor(floor / 10) * 10).toLocaleString("en-GB")}`;
 
-  return (
-    <figure className="waterfall">
-      <figcaption>How the bill moved (window A → window B)</figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Bill change waterfall">
+  const fillOf = (b: Bar) =>
+    b.kind === "total"
+      ? "var(--wf-total)"
+      : b.kind === "up"
+        ? "var(--wf-up)"
+        : b.kind === "down"
+          ? "var(--wf-down)"
+          : "var(--wf-zero)";
+  const isZeroBar = (b: Bar) => b.kind === "zero" || (b.kind !== "total" && Math.abs(b.gbp) < 1e-9);
+
+  let svg: React.ReactNode;
+
+  if (!narrow) {
+    // Vertical bridge: window A, the movements, window B.
+    const W = Math.min(width, 900);
+    const H = 250;
+    const padL = 8;
+    const padR = 8;
+    const padT = 28;
+    const padB = 52;
+    const gap = 10;
+    const barW = (W - padL - padR - gap * (n - 1)) / n;
+    const plotH = H - padT - padB;
+    const yScale = (v: number) => padT + ((maxY - Math.max(v, minY)) / span) * plotH;
+    const hScale = (from: number, to: number) =>
+      Math.max(0, ((Math.min(to, maxY) - Math.max(from, minY)) / span) * plotH);
+
+    svg = (
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Bill change waterfall">
         {bars.map((b, i) => {
           const x = padL + i * (barW + gap);
           const isTotal = b.kind === "total";
-          const isZero = b.kind === "zero" || (!isTotal && Math.abs(b.gbp) < 1e-9);
-          const fill =
-            isTotal
-              ? "var(--wf-total)"
-              : b.kind === "up"
-                ? "var(--wf-up)"
-                : b.kind === "down"
-                  ? "var(--wf-down)"
-                  : "var(--wf-zero)";
-
+          const isZero = isZeroBar(b);
           let top: number;
           let height: number;
-          let showBreak = false;
-
           if (isTotal) {
-            const barBottom = yScale(minY);
             top = yScale(b.gbp);
-            height = Math.max(barBottom - top, 2);
-            showBreak = true;
+            height = Math.max(yScale(minY) - top, 2);
           } else if (isZero) {
-            const y = yScale(levels[i]);
-            top = y - 1;
+            top = yScale(levels[i]) - 1;
             height = 2;
           } else {
             const lo = levels[i];
@@ -181,19 +225,25 @@ export function Waterfall({ decomposition, facts }: Props) {
             top = yScale(hi);
             height = Math.max(hScale(lo, hi), 2);
           }
-
-          const label = isZero ? "£0.00" : b.display;
-
+          const lines = wrapLabel(b.label);
           return (
             <g key={b.key}>
-              <rect x={x} y={top} width={barW} height={height} rx={isZero ? 0 : 3} fill={fill} />
-              {showBreak && <AxisBreak x={x} y={yScale(minY)} w={barW} />}
+              <rect x={x} y={top} width={barW} height={height} rx={isZero ? 0 : 3} fill={fillOf(b)} />
+              {isTotal && <AxisBreak x={x} y={yScale(minY)} w={barW} />}
               <text x={x + barW / 2} y={top - 6} textAnchor="middle" className="wf-value">
-                {label}
+                {isZero ? "£0.00" : b.display}
               </text>
-              <text x={x + barW / 2} y={H - 18} textAnchor="middle" className="wf-label">
-                {b.label}
-              </text>
+              {lines.map((ln, li) => (
+                <text
+                  key={li}
+                  x={x + barW / 2}
+                  y={H - 30 + li * 13}
+                  textAnchor="middle"
+                  className="wf-label"
+                >
+                  {ln}
+                </text>
+              ))}
             </g>
           );
         })}
@@ -203,22 +253,81 @@ export function Waterfall({ decomposition, facts }: Props) {
           const x0 = padL + (i - 1) * (barW + gap) + barW;
           const x1 = padL + i * (barW + gap);
           const y =
-            prev.kind === "total"
-              ? yScale(prev.gbp)
-              : yScale(levels[i - 1] + Math.max(prev.gbp, 0));
+            prev.kind === "total" ? yScale(prev.gbp) : yScale(levels[i - 1] + Math.max(prev.gbp, 0));
           if (y > yScale(minY) + 2) return null;
-          return (
-            <line
-              key={`c-${b.key}`}
-              x1={x0}
-              x2={x1}
-              y1={y}
-              y2={y}
-              className="wf-connector"
-            />
-          );
+          return <line key={`c-${b.key}`} x1={x0} x2={x1} y1={y} y2={y} className="wf-connector" />;
         })}
       </svg>
+    );
+  } else {
+    // Narrow screens: the same bridge laid on its side, one row per bar, real-size text.
+    const W = Math.max(width, 240);
+    const rowH = 30;
+    const barH = 16;
+    const padT = 6;
+    const padL = W < 340 ? 78 : 92;
+    const padR = 70;
+    const H = padT + n * rowH + 4;
+    const plotW = Math.max(W - padL - padR, 60);
+    const xScale = (v: number) => padL + ((Math.max(v, minY) - minY) / span) * plotW;
+    const wScale = (from: number, to: number) =>
+      Math.max(0, ((Math.min(to, maxY) - Math.max(from, minY)) / span) * plotW);
+
+    svg = (
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="img" aria-label="Bill change waterfall">
+        {bars.map((b, i) => {
+          const y = padT + i * rowH + (rowH - barH) / 2;
+          const isTotal = b.kind === "total";
+          const isZero = isZeroBar(b);
+          let left: number;
+          let w: number;
+          if (isTotal) {
+            left = xScale(minY);
+            w = Math.max(xScale(b.gbp) - left, 2);
+          } else if (isZero) {
+            left = xScale(levels[i]) - 1;
+            w = 2;
+          } else {
+            const lo = levels[i];
+            const hi = levels[i] + Math.abs(b.gbp);
+            left = xScale(lo);
+            w = Math.max(wScale(lo, hi), 2);
+          }
+          return (
+            <g key={b.key}>
+              <text x={padL - 8} y={y + barH / 2 + 4} textAnchor="end" className="wf-label">
+                {SHORT_LABEL[b.label] ?? b.label}
+              </text>
+              <rect x={left} y={y} width={w} height={barH} rx={isZero ? 0 : 3} fill={fillOf(b)} />
+              {isTotal && <AxisBreakH x={left} y={y} h={barH} />}
+              <text x={left + w + 6} y={y + barH / 2 + 4} className="wf-value">
+                {isZero ? "£0.00" : b.display}
+              </text>
+            </g>
+          );
+        })}
+        {bars.map((b, i) => {
+          if (i === 0 || b.kind === "total") return null;
+          const prev = bars[i - 1];
+          const x =
+            prev.kind === "total" ? xScale(prev.gbp) : xScale(levels[i - 1] + Math.max(prev.gbp, 0));
+          const y0 = padT + (i - 1) * rowH + (rowH + barH) / 2;
+          const y1 = padT + i * rowH + (rowH - barH) / 2;
+          return <line key={`c-${b.key}`} x1={x} x2={x} y1={y0} y2={y1} className="wf-connector" />;
+        })}
+      </svg>
+    );
+  }
+
+  return (
+    <figure className={`waterfall ${narrow ? "narrow" : ""}`} ref={ref as React.RefObject<HTMLElement>}>
+      <figcaption>How the bill moved (window A → window B)</figcaption>
+      {svg}
+      <p className="wf-legend muted small">
+        <span className="wf-key up" aria-hidden /> adds to the bill
+        <span className="wf-key down" aria-hidden /> reduces it
+        <span className="wf-axis-note">Axis starts at {axisStart} (zoomed; break marks on the totals)</span>
+      </p>
     </figure>
   );
 }
