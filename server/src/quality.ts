@@ -25,6 +25,8 @@ export interface QualityCtx {
   dayStatFacts: string[];                   // single-day statistics (one-off day, unusual days): never the opening of a cost answer
   oneOffFacts: string[];                    // past one-off events: explanations only, never a lever or a saving
   baselineSpikeFacts: string[];             // facts about an unusual day that falls in window A
+  noteAllowed: Record<string, string[]>;    // remembered note (M#) -> the facts it may be used with: the facts it bears on and the other facts of the same tests
+  oneOffWords: string[];                    // words that only the descriptions of past one-off events use ("freezer", "fault"): not for a recommendation
   options: RecOption[];                     // recommendation options, ranked
   fallbackHeadline: string | null;          // deterministic headline used when the model's is unusable
 }
@@ -53,6 +55,23 @@ export function fallbackHeadline(facts: Fact[], type: QuestionType, siteScoped: 
   return `${subject} ${(bill.value as number) >= 0 ? "rose" : "fell"} by ${mag(bill)}${pct && num(pct) !== null ? ` (${mag(pct)})` : ""}`;
 }
 
+const STOP_WORDS = new Set(["sample", "extra", "consumed", "schedule", "events", "event", "which", "their", "later", "again"]);
+/** Words from the descriptions of one-off events (unusual days): a recommendation that uses them is building advice on a past event. */
+function oneOffWords(facts: Fact[]): string[] {
+  const words = facts.filter((f) => /^spike_\d+_event$/.test(f.key)).flatMap((f) => String(f.display).toLowerCase().match(/[a-z]{5,}/g) ?? []);
+  return [...new Set(words)].filter((w) => !STOP_WORDS.has(w));
+}
+/** A remembered note may be used with the facts it bears on and with the other facts of the same tests (the logged event and the timing result it explains). */
+function noteBindings(facts: Fact[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const m of facts.filter((f) => f.memory?.bearsOn?.length)) {
+    const bears = new Set(m.memory!.bearsOn!);
+    const tags = new Set(facts.filter((f) => bears.has(f.id)).map((f) => f.hypothesis).filter(Boolean));
+    out[m.id] = facts.filter((f) => !f.memory && (bears.has(f.id) || (f.hypothesis && tags.has(f.hypothesis)))).map((f) => f.id);
+  }
+  return out;
+}
+
 export function qualityContext(facts: Fact[], hyps: HypInfo[], o: { type: QuestionType; siteScoped: boolean }): QualityCtx {
   const keyId = (...keys: string[]) => keys.map((k) => facts.find((f) => f.key === k)?.id).filter((x): x is string => !!x);
   const status = new Map(hyps.map((h) => [h.id, h.status]));
@@ -73,6 +92,7 @@ export function qualityContext(facts: Fact[], hyps: HypInfo[], o: { type: Questi
     type: o.type, siteScoped: o.siteScoped, siteName: o.siteScoped ? siteName : null, sizeFacts, billFact: bill?.id ?? null, topCause, dayStatFacts: dayStat,
     oneOffFacts: facts.filter((f) => f.hypothesis === "H6" || f.hypothesis === "H11" || (f.hypothesis === "H4" && /^event_/.test(f.key))).map((f) => f.id),
     baselineSpikeFacts: facts.filter((f) => { const k = f.key.match(/^spike_(\d+)_/)?.[1]; return !!k && spikeA.has(k); }).map((f) => f.id),
+    noteAllowed: noteBindings(facts), oneOffWords: oneOffWords(facts),
     options: rankOptions(facts), fallbackHeadline: fallbackHeadline(facts, o.type, o.siteScoped, siteName),
   };
 }
@@ -194,10 +214,25 @@ export function makeChecks(q: QualityCtx, facts: Fact[]): (a: Answer) => VerifyE
       if (core.length > 1 || wordCount(core.join(" ")) > RULED_OUT_MAX_WORDS) out.push(err("ruledOut", i, `a ruled-out item is one short clause (about 20 words, one sentence); this one has ${wordCount(core.join(" "))} words in ${core.length} sentence(s)`));
     });
 
+    // ---- a remembered note is used only with the facts it explains
+    const noteUse = (part: VerifyError["part"], i: number, ids: string[]) => {
+      for (const id of ids) {
+        const allowed = q.noteAllowed[id];
+        if (!allowed) continue;
+        const others = ids.filter((x) => !x.startsWith("M"));
+        if (!others.some((x) => allowed.includes(x))) out.push(err(part, i, `the note ${id} explains ${byId.get(id)?.memory?.bearsOn?.slice(0, 1).map((b) => byId.get(b)?.label).join("") ?? "a different subject"}, not the facts cited here: use it only next to the facts it bears on, or leave it out`));
+      }
+    };
+    a.sentences.forEach((s, i) => noteUse("sentences", i, s.facts));
+    a.ruledOut.forEach((r, i) => noteUse("ruledOut", i, r.facts));
+    noteUse("recommendation", 0, a.recommendation.facts);
+
     // ---- recommendation
     const rec = a.recommendation;
     if (rec.text.trim()) {
       if (/\blevers?\b/i.test(rec.text)) out.push(err("recommendation", 0, "do not call anything a lever: say what was computed"));
+      const word = q.oneOffWords.find((w) => new RegExp(`\\b${w}`, "i").test(rec.text));
+      if (word) out.push(err("recommendation", 0, `the recommendation mentions "${word}", which belongs to a past one-off event; an event explains a change, it is not something to act on`));
       const oneOff = rec.facts.find((id) => q.oneOffFacts.includes(id));
       if (oneOff) out.push(err("recommendation", 0, `the recommendation may not use ${shown(oneOff)}: a past one-off event explains a change, it is not an option`));
       const options = q.options;

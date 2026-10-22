@@ -180,6 +180,38 @@ describe("past one-off events and unusual days in the baseline", () => {
   });
 });
 
+describe("remembered notes and words of past events", () => {
+  const note = (w: ReturnType<typeof world>, bearsOn: string[]): Fact => ({ id: "M1", key: "memory_1", label: "Remembered note", value: "Brixton moved its oven schedule later", unit: "text", display: "Brixton moved its oven schedule later", evidence: "",
+    memory: { id: "mem-1", origin: "user", site: "S2", learnedAt: "2026-10-22T10:00:00.000Z", confidence: 0.9, relevance: 0.4, bearsOn } });
+  it("a note may be used next to the logged event it explains (or another fact of the same test), not next to unrelated facts", () => {
+    const w = world(), m = note(w, [w.f.event.id]);
+    const facts = [...w.facts, m];
+    const q = qualityContext(facts, w.hyps, { type: "why_cost_change", siteScoped: true });
+    assert.deepEqual(q.noteAllowed, { M1: [w.f.event.id] });
+    const check = makeChecks(q, facts);
+    const withNote = (ids: string[], text = "The oven schedule moved, Brixton moved its oven schedule later.") => check(answer(w, { sentences: [...answer(w).sentences.slice(0, 2), item(text, ids)] })).filter((e) => /note M1/.test(e.reason));
+    assert.deepEqual(withNote([w.f.event.id, "M1"]), []);
+    const bad = withNote([w.f.spikeDay.id, w.f.spikeWin.id, "M1"], "An unusual day in window A, the baseline, with Brixton moved its oven schedule later.");
+    assert.equal(bad.length, 1); assert.match(bad[0].reason, /^the note M1 explains /); assert.equal(bad[0].part, "sentences");
+    const inRuled = check(answer(w, { ruledOut: [{ hypothesis: "H5", ...item("Timing is ruled out: only £1.03, Brixton moved its oven schedule later.", [w.f.T.id, "M1"]) }] })).filter((e) => /note M1/.test(e.reason));
+    assert.equal(inRuled.length, 1); assert.equal(inRuled[0].part, "ruledOut");
+  });
+  it("a note that bears on nothing is not policed here (the prompt says a note is never a source of figures)", () => {
+    const w = world(), m = note(w, []);
+    assert.deepEqual(qualityContext([...w.facts, m], w.hyps, { type: "why_cost_change", siteScoped: true }).noteAllowed, {});
+  });
+  it("a recommendation that builds advice on the words of a past one-off event is rejected", () => {
+    const w = world();
+    const spikeEvent: Fact = { id: "F99", key: "spike_1_event", label: "Unusual day 1: logged event", value: "SAMPLE: One-off freezer fault; extra kWh consumed all day.", unit: "text", display: "SAMPLE: One-off freezer fault; extra kWh consumed all day.", evidence: "E1", hypothesis: "H11" };
+    const facts = [...w.facts, spikeEvent];
+    const q = qualityContext(facts, w.hyps, { type: "why_cost_change", siteScoped: true });
+    assert.deepEqual(q.oneOffWords.sort(), ["fault", "freezer"]);
+    const rec = (t: string) => makeChecks(q, facts)(answer(w, { recommendation: item(t, [w.f.flat.id, w.f.saved.id, w.f.kg.id]) })).map(errorLine).filter((e) => /past one-off event; an event explains/.test(e));
+    assert.equal(rec("Staying on Agile saved £170.08 against a flat business tariff, a historical counterfactual; shifting freezer defrost cycles would have saved only £0.10 and 0.4 kgCO2e.").length, 1);
+    assert.deepEqual(rec("Staying on Agile saved £170.08 against a flat business tariff, a historical counterfactual; shifting baking would have saved only £0.10 and 0.4 kgCO2e."), []);
+  });
+});
+
 describe("a sentence about prices shows a price figure", () => {
   it("a bare usage figure, offered as the size of the price effect, is rejected; £, %, p/kWh and pp are fine", () => {
     const w = world();

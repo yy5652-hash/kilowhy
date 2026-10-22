@@ -42,10 +42,10 @@ function repairDigits(raw: string, byId: Map<string, Fact>): { text: string; rep
 }
 
 /** Display strings already carry their unit, so "124 kWh kWh" and "3.1 pp pp" are model slips; a full stop after a description that ends in one is doubled. */
-const UNIT_TWICE = /(\b(?:kWh|kgCO2e|pp|sd|HDD|p\/kWh|days|slots)\b)(?:\s+(?:\1|kilowatt-hours?|percentage points?))\b/gi;
+const UNIT_TWICE = /(\b(?:kWh|kgCO2e|pp|sd|HDD|p\/kWh|p\/day|days|slots)\b)(?:\s+(?:\1|kilowatt-hours?|percentage points?))\b|(\bp\/day)\s+(?:a|per) day\b/gi;
 const UNIT_EXPLAINED = /(\bsd)\s+(?:standard deviations?)\b|(\bkWh\/HDD)\s+(?:kWh\s+)?per (?:heating degree day|HDD)\b|(\bHDD)\s+(?:heating degree days?)\b/gi;
 export function tidy(text: string): string {
-  return text.replace(UNIT_TWICE, "$1").replace(UNIT_EXPLAINED, (_m, a, b, c) => a ?? b ?? c).replace(/(%)\s*(?:percent|per cent|%)/gi, "$1").replace(/(?<!\.)\.\.(?!\.)/g, ".").replace(/\s+([,.;:])/g, "$1").replace(/\s+/g, " ").trim();
+  return text.replace(UNIT_TWICE, (_m, a?: string, b?: string) => a ?? b ?? "").replace(UNIT_EXPLAINED, (_m, a, b, c) => a ?? b ?? c).replace(/(%)\s*(?:percent|per cent|%)/gi, "$1").replace(/(?<!\.)\.\.(?!\.)/g, ".").replace(/\s+([,.;:])/g, "$1").replace(/\s+/g, " ").trim();
 }
 
 /** A time of day or a date written in digits that appears verbatim in exactly one fact's display ("04:00-07:00" inside "10:00-13:00, 04:00-07:00"): keep the words, cite that fact. */

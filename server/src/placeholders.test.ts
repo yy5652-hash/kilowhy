@@ -100,6 +100,7 @@ describe("tidy", () => {
     assert.equal(tidy("about 3.28 kWh/HDD kWh per heating degree day and 2.6 sd standard deviations over 45.0 HDD heating degree days"), "about 3.28 kWh/HDD and 2.6 sd over 45.0 HDD");
     assert.equal(tidy("share 54.9% percent, then 12.0% %"), "share 54.9%, then 12.0%");
     assert.equal(tidy("a freezer fault.. Next ."), "a freezer fault. Next.");
+    assert.equal(tidy("stood at 37.65 p/day p/day and 37.65 p/day a day, 37.65 p/day per day"), "stood at 37.65 p/day and 37.65 p/day, 37.65 p/day");
     assert.equal(tidy("wait... what"), "wait... what");
   });
   it("leaves ordinary text alone", () => { assert.equal(tidy("Saved £5.23 by moving 17.4 kWh of load to 10:00-13:00."), "Saved £5.23 by moving 17.4 kWh of load to 10:00-13:00."); });
