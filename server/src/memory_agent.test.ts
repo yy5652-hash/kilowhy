@@ -25,7 +25,7 @@ function narrativeWithNote(req: ChatRequest): string {
 type Narrative = (req: ChatRequest) => string;
 const ask = async (m: KilowhyMemory, narrative: Narrative | Error = narrativeWithNote, extra: Parameters<typeof investigate>[1] = {}) => {
   const chat = fakeChat({ intent: [INTENT_OK({ sites: ["Brixton"] })], plan: [PLAN_OK()], narrative: [narrative] });
-  const o = ok(await investigate(Q, { data: scenario().data, chat, memory: m, ...extra }));
+  const o = ok(await investigate(Q, { engine: "plain", data: scenario().data, chat, memory: m, ...extra }));
   return { o, chat };
 };
 
@@ -52,7 +52,7 @@ describe("a question with no memory yet", () => {
   });
   it("no memory option: no memory fields, no events, nothing written", async () => {
     const events: ProgressEvent[] = [];
-    const o = ok(await investigate(Q, { data: scenario().data, chat: fakeChat({ intent: [INTENT_OK()], plan: [PLAN_OK()], narrative: [goodNarrative] }), onEvent: (e) => events.push(e) }));
+    const o = ok(await investigate(Q, { engine: "plain", data: scenario().data, chat: fakeChat({ intent: [INTENT_OK()], plan: [PLAN_OK()], narrative: [goodNarrative] }), onEvent: (e) => events.push(e) }));
     assert.equal(o.memory, undefined); assert.ok(!events.some((e) => e.type === "memory"));
   });
 });

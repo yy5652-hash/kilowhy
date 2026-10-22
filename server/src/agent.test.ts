@@ -11,7 +11,7 @@ import type { ProgressEvent } from "./agent_events.ts";
 import type { ChatRequest } from "./provider_shared.ts";
 
 const Q = "Why did our electricity cost more in the last four weeks than the four weeks before?";
-const run = async (q: string, chat: ReturnType<typeof fakeChat>, extra: Parameters<typeof investigate>[1] = {}) => investigate(q, { data: scenario().data, chat, ...extra });
+const run = async (q: string, chat: ReturnType<typeof fakeChat>, extra: Parameters<typeof investigate>[1] = {}) => investigate(q, { engine: "plain", data: scenario().data, chat, ...extra });
 const ok = (o: Awaited<ReturnType<typeof investigate>>): InvestigationResult => { assert.ok(!isClarification(o), "expected an investigation, got a clarification"); return o as InvestigationResult; };
 const stepsOf = (o: InvestigationResult) => o.llmCalls.map((c) => c.step);
 const sorted = (xs: string[]) => [...xs].sort();
@@ -115,7 +115,7 @@ describe("investigate: a verified LLM answer", () => {
   it("each step's user message is unique to the step, and the narrative's depends on its facts (Nightshift caches by user message)", async () => {
     const a = happy(), b = happy();
     await run(Q, a);
-    await investigate(Q, { data: scenario({ price: (w, day, slot) => (slot >= 32 && slot < 38 ? (w === "B" ? 50 : 35) : 12) + (day % 5) }).data, chat: b });
+    await investigate(Q, { engine: "plain", data: scenario({ price: (w, day, slot) => (slot >= 32 && slot < 38 ? (w === "B" ? 50 : 35) : 12) + (day % 5) }).data, chat: b });
     const user = (c: ReturnType<typeof happy>, step: string) => String(c.requests.find((r) => r.step === step)!.req.messages.at(-1)!.content);
     assert.equal(new Set(["intent", "plan", "narrative"].map((s) => user(a, s))).size, 3);
     assert.match(user(a, "narrative"), /Facts table [0-9a-f]{12}: write the answer from it\.$/);
@@ -170,7 +170,7 @@ describe("investigate: concurrency", () => {
     const data = { ...s.data, prefetch: async (q: { sites: string[]; windows: any }) => { stamps.push({ prefetchAt: performance.now(), prefetchSites: q.sites }); await s.data.prefetch!(q); } };
     const chat = fakeChat({ intent: [INTENT_OK()], plan: [PLAN_OK()], narrative: [goodNarrative] }, { intent: 120, plan: 160, narrative: 50 });
     const t0 = performance.now();
-    const o = ok(await investigate(Q, { data, chat }));
+    const o = ok(await investigate(Q, { engine: "plain", data, chat }));
     const at = (step: string) => chat.requests.find((r) => r.step === step)!;
     assert.ok(at("plan").startedAt < at("intent").endedAt, "plan started before the intent finished");
     assert.ok(at("intent").startedAt < at("plan").endedAt, "the two calls overlapped");
@@ -183,7 +183,7 @@ describe("investigate: concurrency", () => {
   it("a plan that arrives long after the data and the intent is not waited for: default emphasis, a note, and the narrative starts without it", async () => {
     const chat = fakeChat({ intent: [INTENT_OK()], plan: [PLAN_OK({ hypotheses: ["H9"] })], narrative: [goodNarrative] }, { plan: 900 });
     const t0 = performance.now();
-    const o = ok(await investigate(Q, { data: scenario().data, chat, planGraceMs: 80 }));
+    const o = ok(await investigate(Q, { engine: "plain", data: scenario().data, chat, planGraceMs: 80 }));
     const narrativeStart = chat.requests.find((r) => r.step === "narrative")!.startedAt;
     const planEnd = chat.requests.find((r) => r.step === "plan")!.endedAt;
     assert.ok(planEnd === 0 || narrativeStart < planEnd, "the narrative did not wait for the plan");
@@ -193,14 +193,14 @@ describe("investigate: concurrency", () => {
     assert.equal(o.verification.mode, "llm");
   });
   it("evidence ids do not depend on timing: the same question gives the same E# for the same hypothesis", async () => {
-    const a = ok(await run(Q, happy())), b = ok(await investigate(Q, { data: scenario().data, chat: fakeChat({ intent: [INTENT_OK()], plan: [PLAN_OK()], narrative: [goodNarrative] }, { intent: 40, plan: 90 }) }));
+    const a = ok(await run(Q, happy())), b = ok(await investigate(Q, { engine: "plain", data: scenario().data, chat: fakeChat({ intent: [INTENT_OK()], plan: [PLAN_OK()], narrative: [goodNarrative] }, { intent: 40, plan: 90 }) }));
     assert.deepEqual(a.evidence.map((e) => [e.id, e.hypothesisId, e.title]), b.evidence.map((e) => [e.id, e.hypothesisId, e.title]));
   });
   it("a scope that differs from the text-based guess redoes the data work and says so", async () => {
     const s = scenario();
     const events: ProgressEvent[] = [];
     const chat = fakeChat({ intent: [INTENT_OK({ sites: ["everything"] })], plan: [PLAN_OK()], narrative: [goodNarrative] });
-    const o = ok(await investigate("Compare Brixton with everything else", { data: s.data, chat, onEvent: (e) => events.push(e) }));
+    const o = ok(await investigate("Compare Brixton with everything else", { engine: "plain", data: s.data, chat, onEvent: (e) => events.push(e) }));
     assert.equal(o.scope.label, "ALL");
     assert.deepEqual(s.prefetchCalls, [["S2"], ["S1", "S2", "S3"]]);
     assert.ok(o.notes.some((n) => /scope changed from S2 to ALL/.test(n)));
@@ -242,7 +242,7 @@ describe("investigate: progress events", () => {
   });
   it("a clarification emits its events too but no done event", async () => {
     const events: ProgressEvent[] = [];
-    const o = await investigate("Why did Peckham use more electricity?", { data: scenario().data, chat: fakeChat({ intent: [INTENT_OK({ sites: ["Peckham"] })], plan: [PLAN_OK()] }), onEvent: (e) => events.push(e) });
+    const o = await investigate("Why did Peckham use more electricity?", { engine: "plain", data: scenario().data, chat: fakeChat({ intent: [INTENT_OK({ sites: ["Peckham"] })], plan: [PLAN_OK()] }), onEvent: (e) => events.push(e) });
     assert.ok(isClarification(o));
     assert.ok(events.some((e) => e.type === "step" && e.step === "intent" && e.status === "finished"));
     assert.ok(!events.some((e) => e.type === "done"));
@@ -435,7 +435,7 @@ describe("investigate: entity resolution", () => {
   });
   it("the question's own site mention counts when the model forgot it; 'site 3' works too; a site named in the question is not rerun after the intent", async () => {
     const s = scenario();
-    const a = ok(await investigate("Why did Brixton use more electricity?", { data: s.data, chat: fakeChat({ intent: [INTENT_OK()], plan: [PLAN_OK()], narrative: [new Error("x")] }) }));
+    const a = ok(await investigate("Why did Brixton use more electricity?", { engine: "plain", data: s.data, chat: fakeChat({ intent: [INTENT_OK()], plan: [PLAN_OK()], narrative: [new Error("x")] }) }));
     assert.equal(a.scope.label, "S2");
     assert.deepEqual(s.prefetchCalls, [["S2"]], "the speculative scope was right, so the data work ran once");
     const b = ok(await run("Why did site 3 use more electricity?", fakeChat({ intent: [INTENT_OK({ sites: ["site 3"] })], plan: [PLAN_OK()], narrative: [new Error("x")] })));
@@ -551,7 +551,7 @@ describe("investigate: the plan orders the tests", () => {
 
 describe("template narrative", () => {
   const prepare = async (type: Parameters<typeof templateAnswer>[2], over: Parameters<typeof scenario>[0] = {}) => {
-    const o = ok(await investigate("q", { data: scenario(over).data, chat: fakeChat({ intent: [INTENT_OK({ type })], plan: [PLAN_OK()], narrative: [new Error("x")] }) }));
+    const o = ok(await investigate("q", { engine: "plain", data: scenario(over).data, chat: fakeChat({ intent: [INTENT_OK({ type })], plan: [PLAN_OK()], narrative: [new Error("x")] }) }));
     const hyps = o.results.map((r) => ({ id: r.id, name: r.name, status: r.status }));
     const check = (a: ReturnType<typeof templateAnswer>) => verifyAnswer(a, { facts: o.facts, evidenceIds: o.evidence.map((e) => e.id), hypotheses: hyps, requireRecommendation: true }).errors;
     return { o, hyps, check };

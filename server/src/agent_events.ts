@@ -11,6 +11,7 @@ export type ProgressEvent =
   | { type: "llm"; call: LlmCall }
   | { type: "memory"; action: "recall"; query: string; count: number; ids: string[]; route: string; ms: number }                // H-MEM recall at the start
   | { type: "memory"; action: "write"; written: { id: string; hypothesis: string }[]; skipped: number }                  // confirmed causes written after the answer
+  | { type: "chunk"; id: number; kind: string; label: string; ms: number; llmCalls: number; inputTokens: number; outputTokens: number; carryoverTokens: number; route: string | null }   // one chunk of the Markovian chain finished (tokens estimated, chars/4)
   | { type: "reset"; reason: string }   // the speculative data work was for a different scope: clear evidence and hypotheses shown so far
   | { type: "done"; totalMs: number };
 

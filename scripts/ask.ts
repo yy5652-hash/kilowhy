@@ -12,10 +12,11 @@ import { KilowhyWorld } from "../server/src/worldmodel.ts";
 const { question, site } = parseArgs(process.argv.slice(2));
 if (!question) { console.error('usage: node scripts/ask.ts "question" [--site S2]'); process.exit(2); }
 
-// H-MEM (data/cache/hmem) and the World Model (data/cache/worldmodel) persist between questions; --no-memory asks without H-MEM.
+// H-MEM (data/cache/hmem) and the World Model (data/cache/worldmodel) persist between questions; --no-memory asks without H-MEM; --plain runs the single plan + narrative loop instead of the Markovian chain.
+// The per-chunk token log of the chain is appended to eval/markovian_tokens.json.
 const memory = process.argv.includes("--no-memory") ? undefined : defaultMemory();
 const world = KilowhyWorld.create({ storage: "local", directory: WORLD_DIR });
-const outcome = await investigate(question, { zsql, site, memory, world, onProgress: (m) => process.stderr.write(`  ... ${m}\n`) });
+const outcome = await investigate(question, { zsql, site, memory, world, markovian: { logPath: new URL("../eval/markovian_tokens.json", import.meta.url).pathname, historyDir: new URL("../data/cache/markovian", import.meta.url).pathname }, engine: process.argv.includes("--plain") ? "plain" : "markovian", onProgress: (m) => process.stderr.write(`  ... ${m}\n`) });
 console.log(renderOutcome(outcome));
 
 const file = answerFile(question, site);

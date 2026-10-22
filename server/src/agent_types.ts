@@ -6,6 +6,7 @@ import type { Answer, VerifyError } from "./verifier.ts";
 import type { Recommendation, TariffComparison } from "./recommend.ts";
 import type { Route } from "./provider_shared.ts";
 import type { DateWindow } from "./windows.ts";
+import type { MarkovianReport } from "./investigate_markovian.ts";
 
 export const INTENT_TYPES = ["why_cost_change", "why_spike_day", "why_emissions", "what_to_change"] as const;
 export type IntentType = (typeof INTENT_TYPES)[number];
@@ -65,6 +66,8 @@ export interface InvestigationResult {
   notes: string[];
   sampleDataNote: string;
   memory?: MemoryReport;                      // present when the investigation ran with H-MEM
+  engine?: "markovian" | "plain";             // how the LLM part ran
+  markovian?: MarkovianReport;                // the chunks of the Markovian chain with their tokens (engine "markovian")
 }
 /** What H-MEM did in this investigation: memories recalled at the start (each is an M# fact) and causes written at the end. */
 export interface MemoryReport {

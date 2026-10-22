@@ -11,6 +11,9 @@ import type { KilowhyMemory, Recall } from "./memory.ts";
 import { memoryFacts, memorySnippets } from "./memory_facts.ts";
 import { confirmCauses, type WrittenMemory } from "./memory_confirm.ts";
 import { memoryReport, recallFor } from "./agent_memory.ts";
+import { runMarkovianChain } from "./investigate_markovian.ts";
+import { tapChat, type Tape } from "./markovian_log.ts";
+import { appendTokenLog } from "./markovian_file.ts";
 import { CATALOG, HYPOTHESIS_IDS } from "./hypotheses/index.ts";
 import type { HypothesisId } from "./hypotheses/types.ts";
 import { WINDOW_A, WINDOW_B, type DateWindow } from "./windows.ts";
@@ -23,7 +26,7 @@ import { datesIn, fallbackIntentType, type SiteRef } from "./agent_sites.ts";
 import { guessSites, resolveScope } from "./agent_scope.ts";
 import { runExtraSql } from "./agent_extra.ts";
 import { runScope, type ScopeRun } from "./agent_run.ts";
-import { narrate } from "./agent_narrate.ts";
+import { narrate, type NarrateOutcome } from "./agent_narrate.ts";
 import { templateAnswer } from "./agent_template.ts";
 import { safeEmit, timed, type ProgressEvent } from "./agent_events.ts";
 import { DEFAULT_REASONING } from "./agent_reasoning.ts";
@@ -32,6 +35,8 @@ import { SAMPLE_NOTE, type ClarificationResult, type DecompositionSummary, type 
 export interface InvestigateOpts {
   zsql?: ZSql;                    // Zetaris runner: needed for the planner's extra SQL and, without `data`, to build the data layer
   data?: DataLayer;               // default: createZetarisData(zsql)
+  engine?: "markovian" | "plain"; // how the LLM part runs: Markovian chunks (plan, interpret batches, narrative, verify; the default) or the single plan + narrative loop
+  markovian?: { batchSize?: number; logPath?: string; historyDir?: string };   // hypotheses per interpret chunk (default 5, see BATCH_SIZE in investigate_markovian.ts); logPath: where the per-chunk token log is appended (default: not written); historyDir: the engine's own run history
   memory?: KilowhyMemory;         // H-MEM: recalled at the start (M# facts, plan prompt), confirmed causes written at the end; default: no memory
   world?: KilowhyWorld;           // the World Model (sites, aliases, ops_log events); default: a new in-memory one, ingested from `data` at the start
   chat?: ChatFn;                  // default: the Meterless/NVIDIA provider
@@ -92,8 +97,10 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   const clarify = (text: string, known: SiteRef[]): ClarificationResult => ({ question, clarification: text, knownSites: known, llmCalls: [...calls], timings: { ...timings, total: total() } });
 
   // The plan sees only the question (and, with H-MEM, the notes recalled for the sites it mentions), so its call starts at once without memory and right after the recall with it; either way it overlaps the data work.
+  const planTape: Tape = [], planEnv: LlmEnv = { ...env, chat: tapChat(env.chat, planTape) };   // the plan call's messages and usage, for the chain's first chunk
+  let planMem = "";
   const startPlan = (memories = "") =>
-    timed(emit, timings, "plan", () => askJson(env, "plan", "deep", planMessages({ question, memories }), checkPlan, { maxTokens: PLAN_MAX_TOKENS, deadlineMs: deadline.plan, hedgeAfterMs: hedge.plan }));
+    timed(emit, timings, "plan", () => askJson(planEnv, "plan", "deep", planMessages({ question, memories }), checkPlan, { maxTokens: PLAN_MAX_TOKENS, deadlineMs: deadline.plan, hedgeAfterMs: hedge.plan }));
   const earlyPlanP = opts.memory ? null : startPlan();
   earlyPlanP?.catch(() => {});
 
@@ -105,7 +112,7 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   const label = (ids: string[]) => (ids.length === known.length ? "ALL" : ids.join("+"));
   let recall: Recall | null = null;
   const recallP = opts.memory ? recallFor(opts.memory, question, guess, known, emit) : null;
-  const planP = earlyPlanP ?? recallP!.then((r) => { recall = r; return startPlan(memorySnippets(memoryFacts(r, guess))); });
+  const planP = earlyPlanP ?? recallP!.then((r) => { recall = r; planMem = memorySnippets(memoryFacts(r, guess)); return startPlan(planMem); });
   planP.catch(() => {});
   const specTimings: Record<string, number> = {};
   const specP = runScope({ data, siteIds: guess, label: label(guess), windowA, windowB, emit, timings: specTimings, world });
@@ -169,8 +176,20 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   // ---- 6 + verify: placeholder narrative with up to 2 corrective retries, else the template
   const titles = Object.fromEntries(CATALOG.map((c) => [c.id as string, c.title]));
   const scopeText = `${scope.siteIds.map((s) => `${s} ${siteNames[s]}`).join("; ")}; window A ${windowA.from} to ${addDays(windowA.toExclusive, -1)} (baseline), window B ${windowB.from} to ${addDays(windowB.toExclusive, -1)} (current)`;
-  const messages = narrativeMessages({ question, type: intent.type, scopeText, facts: relevantFacts(facts, hyps, base.slice(0, 6), intent.type), hypotheses: hyps.filter((h) => !offHypotheses(intent.type).includes(h.id)), titles, focusDates: intent.dates, hasRecommendation: vctx.requireRecommendation === true });
-  const nr = await timed(emit, timings, "narrative", () => narrate({ env, messages, facts, vctx, maxCorrections: opts.maxCorrections ?? 2, deadlineMs: deadline.narrative, hedgeAfterMs: hedge.narrative }));
+  const engineName = opts.engine ?? "markovian";
+  let nr: NarrateOutcome, markovian: Awaited<ReturnType<typeof runMarkovianChain>>["report"] | undefined;
+  if (engineName === "markovian") {
+    const chain = await timed(emit, timings, "narrative", () => runMarkovianChain({
+      env, question, type: intent.type, scopeText, scopeName: scope.label === "ALL" ? "ALL" : scope.siteIds.map((s) => `${s} ${siteNames[s]}`).join("; "),
+      windows: `A ${windowA.from}..${addDays(windowA.toExclusive, -1)} | B ${windowB.from}..${addDays(windowB.toExclusive, -1)}`,
+      facts, hyps, results, titles, plan, planTape, planMemories: planMem, focusDates: intent.dates, hasRecommendation: vctx.requireRecommendation === true, vctx, emphasis: base.slice(0, 6),
+      maxCorrections: opts.maxCorrections ?? 2, deadlineMs: deadline.narrative, hedgeAfterMs: hedge.narrative, batchSize: opts.markovian?.batchSize, historyDir: opts.markovian?.historyDir, emit,
+    }));
+    nr = chain.narration; markovian = chain.report;
+  } else {
+    const messages = narrativeMessages({ question, type: intent.type, scopeText, facts: relevantFacts(facts, hyps, base.slice(0, 6), intent.type), hypotheses: hyps.filter((h) => !offHypotheses(intent.type).includes(h.id)), titles, focusDates: intent.dates, hasRecommendation: vctx.requireRecommendation === true });
+    nr = await timed(emit, timings, "narrative", () => narrate({ env, messages, facts, vctx, maxCorrections: opts.maxCorrections ?? 2, deadlineMs: deadline.narrative, hedgeAfterMs: hedge.narrative }));
+  }
   let answer: Answer;
   let verification: Verification;
   if (nr.answer) {
@@ -184,7 +203,7 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   const decomposition: DecompositionSummary = { ok: dec.ok, error: dec.error, result: dec.result, standing: dec.standing, vatRate: dec.vatRate, evidenceId: dec.evidenceId, contractEvidenceId: dec.contractEvidenceId, warnings: dec.warnings, slotsAligned: dec.aligned.kept, slotsExpected: dec.aligned.expected };
   const out: InvestigationResult = {
     question, intent, scope: { label: scope.label, sites: scope.siteIds.map((id) => ({ id, name: siteNames[id] })), windowA, windowB }, decomposition, plan, results, evidence: evidence.list(), facts,
-    recommendation: { loadShift, tariff }, answer, verification, llmCalls: [...calls], timings, notes, sampleDataNote: SAMPLE_NOTE,
+    recommendation: { loadShift, tariff }, answer, verification, llmCalls: [...calls], timings, notes, sampleDataNote: SAMPLE_NOTE, engine: engineName, ...(markovian ? { markovian } : {}),
   };
   // ---- H-MEM: the supported causes are written to memory with their provenance (after the answer, so the answer never waits on a failed write)
   if (opts.memory) {
@@ -194,6 +213,10 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
     out.memory = memoryReport(recall, memFacts, answer, written);
   }
   timings.total = total();
+  if (markovian && opts.markovian?.logPath) {
+    try { appendTokenLog(opts.markovian.logPath, { at: new Date().toISOString(), question, scope: scope.label, verificationMode: verification.mode, narrativeAttempts: verification.attempts, totalMs: timings.total, timings: { ...timings }, report: markovian }); }
+    catch (e) { notes.push(`token log not written: ${e instanceof Error ? e.message : e}`); }
+  }
   emit({ type: "done", totalMs: timings.total });
   return out;
 }

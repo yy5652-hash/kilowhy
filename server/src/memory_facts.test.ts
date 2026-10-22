@@ -26,3 +26,31 @@ describe("memoryFacts", () => {
     assert.equal(memorySnippets([]), "");
   });
 });
+
+describe("the template mentions a remembered note next to the schedule change it explains", () => {
+  const f = (id: string, key: string, value: string | number, unit: string, display: string, hypothesis?: string) => ({ id, key, label: key, value, unit, display, evidence: "E1", ...(hypothesis ? { hypothesis } : {}) });
+  const base = [
+    f("F1", "T", 1.03, "GBP", "£1.03", "H5"), f("F2", "T_share", 1, "%", "1.0%", "H5"),
+    f("F3", "schedule_site", "S2", "text", "S2", "H5"), f("F4", "schedule_band", "night", "text", "night", "H5"), f("F5", "schedule_delta_pp", -8.3, "pp", "−8.3 pp", "H5"), f("F6", "schedule_change_date", "2026-10-07", "date", "2026-10-07", "H5"),
+    f("F7", "schedule_event", "SAMPLE: Oven schedule moved 2h later", "text", "SAMPLE: Oven schedule moved 2h later", "H5"),
+  ];
+  const note = (site?: string) => ({ id: "M1", key: "memory_1", label: "note", value: "Oven moved later", unit: "text", display: '"Oven moved later" (your note, 2026-10-22)', evidence: "",
+    memory: { id: "mem-1", origin: "user" as const, site, learnedAt: "2026-10-22T10:00:00.000Z", confidence: 0.9, relevance: 0.4 } });
+  it("a note for the site, or for no site, is cited in the ruled-out timing item and the answer verifies", async () => {
+    const { templateAnswer } = await import("./agent_template.ts");
+    const { verifyAnswer } = await import("./verifier.ts");
+    for (const site of ["S2", undefined]) {
+      const facts = [...base, note(site)], hyps = [{ id: "H5", name: "timing_shift", status: "ruled_out" as const }];
+      const a = templateAnswer(facts, hyps, "why_cost_change");
+      const item = a.ruledOut.find((r) => r.hypothesis === "H5")!;
+      assert.ok(item.facts.includes("M1"), `site ${site}`); assert.ok(item.text.includes('Your note on file says "Oven moved later" (your note, 2026-10-22)'));
+      assert.ok(item.evidence.length > 0 && item.evidence.every(Boolean), "evidence comes from the data facts only");
+      assert.equal(verifyAnswer({ ...a, headline: a.headline, sentences: [{ text: "Timing: £1.03.", facts: ["F1"], evidence: ["E1"] }] }, { facts, evidenceIds: ["E1"], hypotheses: hyps }).errors.filter((e) => e.part === "ruledOut").length, 0);
+    }
+  });
+  it("a note about another site is not mentioned", async () => {
+    const { templateAnswer } = await import("./agent_template.ts");
+    const a = templateAnswer([...base, note("S3")], [{ id: "H5", name: "timing_shift", status: "ruled_out" as const }], "why_cost_change");
+    assert.ok(!a.ruledOut.some((r) => r.facts.includes("M1")));
+  });
+});

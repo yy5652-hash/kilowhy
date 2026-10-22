@@ -25,10 +25,10 @@ export const route = (model = "mock/model-x", mode = "deep", latencyMs = 5): Rou
 });
 export const reply = (content: string, mode = "deep"): ChatResult => ({ content, rawContent: content, toolCalls: [], route: route("mock/model-x", mode) });
 
-export type Step = "intent" | "plan" | "narrative";
+export type Step = "intent" | "plan" | "interpret" | "narrative";
 export const stepOf = (req: ChatRequest): Step => {
   const sys = String(req.messages[0]?.content ?? "");
-  return sys.startsWith("You classify") ? "intent" : sys.startsWith("You plan") ? "plan" : "narrative";
+  return sys.startsWith("You classify") ? "intent" : sys.startsWith("You plan") ? "plan" : sys.startsWith("You read the results") ? "interpret" : "narrative";
 };
 
 export interface FactLine { id: string; hyp: string; label: string; display: string }
@@ -92,4 +92,14 @@ export function fakeChat(script: Partial<Record<Step, (string | ((req: ChatReque
     return reply(typeof item === "function" ? item(req) : item, step === "intent" ? "auto" : "deep");
   };
   return Object.assign(fn as ChatFn, { requests });
+}
+
+/** A valid interpret reply for the tests named in the prompt: one reading per test that cites the first fact listed under it. */
+export function interpretOk(req: ChatRequest): string {
+  const user = String(req.messages[1].content);
+  const readings = [...user.matchAll(/^(H\d+) [^\n]*: (?:supported|ruled_out|inconclusive)\n(?:F\d+ \[H\d+\][^\n]*\n?)*/gm)].map((m) => {
+    const f = m[0].match(/^(F\d+) /m)?.[1];
+    return { id: m[1], reading: f ? `${m[1]} was read from the facts, see {${f}}` : `${m[1]} has no facts` };
+  });
+  return JSON.stringify({ readings });
 }

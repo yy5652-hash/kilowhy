@@ -123,7 +123,7 @@ export class KilowhyMemory {
   /** Hybrid-ranked recall (the engine's formula; semantic term from provider vectors). Never throws on an embedding failure: the engine's own hash embedder takes over and the result says so. */
   async recall(query: string, o: { site?: string; k?: number; threshold?: number } = {}): Promise<Recall> {
     const t0 = performance.now();
-    let route = "hash (no embedder configured)", fallback: string | undefined, qv: number[] | null = null;
+    let route = this.embedFn ? "none (nothing remembered yet)" : "hash (no embedder configured)", fallback: string | undefined, qv: number[] | null = null;
     if (this.embedFn && this.store.all().length) {
       try {
         const q = await this.embedFn([query], { inputType: "query" });
@@ -139,7 +139,7 @@ export class KilowhyMemory {
     this.retrieval.queryVector = null;
     return {
       query, site: o.site, context: res.context, trace: res.trace, embed: { route, ms: Math.round(performance.now() - t0), ...(fallback ? { fallback } : {}) },
-      memories: res.memories.map(({ memory: m, relevance }) => ({ ...describe(m), relevance })),
+      memories: res.memories.map(({ memory: m, relevance }) => ({ ...describeMemory(m), relevance })),
     };
   }
 
@@ -149,11 +149,11 @@ export class KilowhyMemory {
   get(id: string): MemoryRecord | undefined { return this.store.get(id); }
   /** All memories (optionally one site's, plus those without a site), newest first. */
   list(o: { site?: string } = {}): RecalledMemory[] {
-    return this.store.all().filter((m) => !o.site || !siteOf(m) || siteOf(m) === o.site).map((m) => ({ ...describe(m), relevance: 0 })).sort((a, b) => b.learnedAt.localeCompare(a.learnedAt) || b.id.localeCompare(a.id));
+    return this.store.all().filter((m) => !o.site || !siteOf(m) || siteOf(m) === o.site).map((m) => ({ ...describeMemory(m), relevance: 0 })).sort((a, b) => b.learnedAt.localeCompare(a.learnedAt) || b.id.localeCompare(a.id));
   }
   findByKey(key: string): MemoryRecord | undefined { return this.store.all().find((m) => m.tags.includes(`key:${key}`)); }
 }
 
-export function describe(m: MemoryRecord): Omit<RecalledMemory, "relevance"> {
+export function describeMemory(m: MemoryRecord): Omit<RecalledMemory, "relevance"> {
   return { id: m.id, text: m.content, origin: originOf(m), site: siteOf(m), learnedAt: stamp(m.provenance.learnedAt), validFrom: validFromOf(m), confidence: m.confidence, layer: m.layer, provenance: m.provenance };
 }
