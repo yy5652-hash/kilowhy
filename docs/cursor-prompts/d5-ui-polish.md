@@ -1,0 +1,14 @@
+Polish the Kilowhy web UI in `web/`. ONLY create or modify files under `web/` (and append a dated section to `docs/cursor-usage.md`). Do NOT touch `server/`, `scripts/`, `eval/`, `vendor/` — other agents are working there.
+
+The live server is running at http://127.0.0.1:5174 (UI + API). Read `server/src/http.ts` for the endpoints, `server/src/agent_types.ts` / `server/src/agent_events.ts` for shapes, and the newest real result in `eval/answers/why-did-our-electricity-cost-more-in-the-last-four.json` — it now has top-level `markovian` (chunks with token counts and naive estimates), `memory` (recall query, recalled memories, trace, embed route) and `llmCalls[].route` (provider, requestedModel, routedModel, label, kind, tier, receiptId, raceWidth, usage, latencyMs). Refresh `web/src/fixtures/` from `eval/answers/*.json`.
+
+Changes:
+1. Waterfall: zoom the value axis so the increments are clearly visible (start the axis at about 90% of the smaller of window A/B cost, draw a small axis-break mark on the two total bars), value labels above every bar, increases in a warm colour and decreases in a cool colour, zero-height bars shown as a thin line with "£0.00". Keep the totals exactly as the fact displays.
+2. Memory panel (H-MEM): list `GET /api/memory?site=` grouped by site, each with origin badge ("your note" vs "agent finding"), date learned, valid-from date when present, confidence; an "Audit trail" expander calling `GET /api/memory/:id/audit` showing the ledger entries (action, actor, time). "Add a note" form (site select + textarea) → `POST /api/notes`, then refresh. Clicking an [M#] chip in an answer opens the matching memory and highlights it. Show a short line when the current answer recalled memories ("Recalled 1 note about Brixton").
+3. LLM receipts: every LLM step in the timeline and in the answer's "How this answer was made" section is expandable to show the Meterless Nightshift compute receipt fields (receipt id, requested → routed model, label, tier, race width, latency, token usage); NVIDIA-direct fallbacks clearly labelled as such.
+4. "How this answer was made" section under the answer: (a) Markovian chain — a small SVG bar chart of input tokens per chunk vs the naive full-history estimate (label estimates as estimated), with chunk labels; (b) H-MEM recall summary; (c) World Model: entity counts from `GET /api/entities`; (d) the step timings.
+5. "Recent answers" list (from `GET /api/answers`) under the question box to reopen saved results instantly (useful for demos); clicking one loads `/api/answers/:slug`.
+6. Headline: render the headline in sentence case if it arrives in ALL CAPS.
+7. Check the layout at 375 px and 1280 px, keyboard focus states, and colour contrast in light and dark themes.
+
+Run `npm run build` in `web/` until it passes with no TypeScript errors. Do not commit. Append to `docs/cursor-usage.md` what you built in this session.

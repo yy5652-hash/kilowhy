@@ -32,6 +32,17 @@ export interface Evidence {
   sources: EvidenceSource[];
 }
 
+export interface FactMemoryRef {
+  id: string;
+  origin: "user" | "agent";
+  site?: string;
+  learnedAt: string;
+  validFrom?: string;
+  confidence: number;
+  relevance: number;
+  bearsOn?: string[];
+}
+
 export interface Fact {
   id: string;
   key: string;
@@ -41,6 +52,7 @@ export interface Fact {
   display: string;
   evidence: string;
   hypothesis?: string;
+  memory?: FactMemoryRef;
 }
 
 export interface AnswerItem {
@@ -239,6 +251,55 @@ export interface Plan {
   source: "llm" | "default";
 }
 
+export interface MarkovianChunk {
+  id: number;
+  kind: string;
+  label: string;
+  ms: number;
+  llmCalls: number;
+  inputTokens: { estimated: number; measured: number | null };
+  outputTokens: { estimated: number; measured: number | null };
+  carryoverIn: number;
+  carryoverOut: number;
+  taskTokens: number;
+  naiveInputTokens: number;
+  route: string | null;
+  receiptIds: string[];
+  note?: string;
+}
+
+export interface MarkovianReport {
+  engine: "markovian";
+  reference: string;
+  config: { chunkSize: number; maxChunks: number; carryoverTokens: number; batchSize: number };
+  status: string;
+  chunks: MarkovianChunk[];
+  totals?: unknown;
+  finalState?: unknown;
+  carryoverShrunk?: string[];
+  notes?: string[];
+}
+
+export interface MemoryRecalled {
+  id: string;
+  factId: string;
+  relevance: number;
+  origin: "user" | "agent";
+  site?: string;
+  learnedAt: string;
+  text: string;
+  citedIn: number;
+}
+
+export interface MemoryReport {
+  query: string;
+  embedRoute: string;
+  recallMs: number;
+  recalled: MemoryRecalled[];
+  written: { id: string; hypothesis: string; text: string; skipped: boolean }[];
+  trace?: unknown;
+}
+
 export interface InvestigationResult {
   question: string;
   intent: Intent;
@@ -256,6 +317,9 @@ export interface InvestigationResult {
   notes: string[];
   sampleDataNote: string;
   generatedAt?: string;
+  memory?: MemoryReport;
+  engine?: "markovian" | "plain";
+  markovian?: MarkovianReport;
 }
 
 export interface ClarificationResult {
@@ -281,7 +345,8 @@ export type StepName =
   | "extraSql"
   | "facts"
   | "narrative"
-  | "template";
+  | "template"
+  | "memory";
 
 export type ProgressEvent =
   | { type: "step"; step: StepName; status: "started" | "finished"; ms?: number }
@@ -298,24 +363,92 @@ export type ProgressEvent =
     }
   | { type: "hypothesis"; id: string; name: string; status: string }
   | { type: "llm"; call: LlmCall }
+  | {
+      type: "memory";
+      action: "recall";
+      query: string;
+      count: number;
+      ids: string[];
+      route: string;
+      ms: number;
+    }
+  | {
+      type: "memory";
+      action: "write";
+      written: { id: string; hypothesis: string }[];
+      skipped: number;
+    }
+  | {
+      type: "chunk";
+      id: number;
+      kind: string;
+      label: string;
+      ms: number;
+      llmCalls: number;
+      inputTokens: number;
+      outputTokens: number;
+      carryoverTokens: number;
+      route: string | null;
+    }
   | { type: "reset"; reason: string }
   | { type: "done"; totalMs: number };
 
 export type MeterlessStatus = "online" | "unauthorized" | "offline";
 
 export interface ApiStatus {
-  zetaris: { ok: boolean; views: number };
+  zetaris: { ok: boolean; ms?: number; views: number };
   meterless: { status: MeterlessStatus; baseUrl: string | null };
   fallback: { enabled: boolean };
   lastRoute?: Route | null;
+  busy?: boolean;
 }
 
-export interface MemoryNote {
+export interface MemoryRecord {
   id: string;
-  site: string;
   text: string;
-  createdAt: string;
-  source?: string;
+  relevance: number;
+  origin: "user" | "agent";
+  site?: string;
+  learnedAt: string;
+  validFrom?: string;
+  key?: string;
+  confidence: number;
+  layer: string;
+  provenance?: unknown;
+}
+
+/** @deprecated use MemoryRecord — kept for older call sites */
+export type MemoryNote = MemoryRecord & { createdAt?: string; source?: string };
+
+export interface LedgerEntry {
+  memoryId?: string;
+  action: string;
+  actor: string;
+  timestamp: number;
+  previousState?: unknown;
+  newState?: unknown;
+  details?: unknown;
+}
+
+export interface EntityCounts {
+  entities: Record<string, number>;
+  relationships: number;
+  facts: number;
+  events?: number;
+  audit?: number;
+}
+
+export interface EntitiesResponse {
+  sites: { id: string; name: string; aliases?: string[] }[];
+  counts: EntityCounts;
+}
+
+export interface AnswerListItem {
+  slug: string;
+  question: string;
+  generatedAt?: string;
+  headline?: string;
+  site?: { id: string; name: string }[];
 }
 
 export interface AskHandlers {

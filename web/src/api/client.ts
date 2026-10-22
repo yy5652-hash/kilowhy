@@ -1,9 +1,12 @@
 import type {
+  AnswerListItem,
   ApiStatus,
   AskHandlers,
+  EntitiesResponse,
   InvestigateOutcome,
   InvestigationResult,
-  MemoryNote,
+  LedgerEntry,
+  MemoryRecord,
   ProgressEvent,
   StepName,
 } from "../types";
@@ -23,7 +26,7 @@ export async function fetchStatus(): Promise<ApiStatus> {
   return jsonOrThrow<ApiStatus>(res);
 }
 
-export async function fetchAnswers(): Promise<{ slug: string; question: string }[]> {
+export async function fetchAnswers(): Promise<AnswerListItem[]> {
   const res = await fetch(`${API}/answers`);
   return jsonOrThrow(res);
 }
@@ -33,25 +36,31 @@ export async function fetchAnswer(slug: string): Promise<InvestigationResult> {
   return jsonOrThrow<InvestigationResult>(res);
 }
 
-export async function fetchMemory(site: string): Promise<MemoryNote[]> {
-  const res = await fetch(`${API}/memory?site=${encodeURIComponent(site)}`);
+export async function fetchMemory(site?: string): Promise<MemoryRecord[]> {
+  const q = site ? `?site=${encodeURIComponent(site)}` : "";
+  const res = await fetch(`${API}/memory${q}`);
   if (res.status === 404) return [];
-  return jsonOrThrow<MemoryNote[]>(res);
+  return jsonOrThrow<MemoryRecord[]>(res);
 }
 
-export async function postNote(site: string, text: string): Promise<MemoryNote> {
+export async function postNote(site: string, text: string): Promise<{ id: string }> {
   const res = await fetch(`${API}/notes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ site, text }),
   });
-  return jsonOrThrow<MemoryNote>(res);
+  return jsonOrThrow<{ id: string }>(res);
 }
 
-export async function fetchAudit(id: string): Promise<unknown> {
+export async function fetchAudit(id: string): Promise<LedgerEntry[]> {
   const res = await fetch(`${API}/memory/${encodeURIComponent(id)}/audit`);
   if (res.status === 404) throw new Error("Audit not available yet");
-  return jsonOrThrow(res);
+  return jsonOrThrow<LedgerEntry[]>(res);
+}
+
+export async function fetchEntities(): Promise<EntitiesResponse> {
+  const res = await fetch(`${API}/entities`);
+  return jsonOrThrow<EntitiesResponse>(res);
 }
 
 /** Parse SSE from a POST ReadableStream (not EventSource). */

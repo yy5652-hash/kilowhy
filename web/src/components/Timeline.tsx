@@ -1,5 +1,6 @@
 import type { EvidenceSource, LlmCall, ProgressEvent, StepName } from "../types";
-import { formatRoute, sourceBadges, stepLabel } from "../format";
+import { sourceBadges } from "../format";
+import { LlmReceipt } from "./LlmReceipt";
 
 export interface TimelineEvidence {
   id: string;
@@ -65,7 +66,7 @@ export function reduceTimeline(state: TimelineState, event: ProgressEvent): Time
 }
 
 const STAGE_ORDER: { label: string; steps: StepName[] }[] = [
-  { label: "Understand question", steps: ["sites", "intent", "plan"] },
+  { label: "Understand question", steps: ["sites", "intent", "plan", "memory"] },
   { label: "Split the bill", steps: ["data"] },
   { label: "Test hypotheses", steps: ["hypotheses", "extraSql", "recommend"] },
   { label: "Write answer", steps: ["facts", "narrative", "template"] },
@@ -106,13 +107,8 @@ export function Timeline({ state, visible, onOpenEvidence }: Props) {
       {state.llmCalls.length > 0 && (
         <ul className="llm-routes">
           {state.llmCalls.map((call, i) => (
-            <li key={`${call.step}-${i}`} className={call.route?.provider === "nvidia-direct" ? "fallback" : ""}>
-              <span className="llm-step">{stepLabel(call.step)}</span>
-              {call.route ? (
-                <span className="llm-route">{formatRoute(call.route)}</span>
-              ) : (
-                <span className="llm-route error">{call.error ?? "no route"}</span>
-              )}
+            <li key={`${call.step}-${i}`}>
+              <LlmReceipt call={call} />
             </li>
           ))}
         </ul>

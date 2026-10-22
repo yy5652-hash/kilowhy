@@ -1,22 +1,29 @@
 import type { InvestigationResult } from "../types";
+import { memoryIdFromChip, recallSummaryLine, sentenceCaseHeadline } from "../format";
 import { SentenceWithCites } from "./CitedText";
 import { Waterfall } from "./Waterfall";
 
 interface Props {
   result: InvestigationResult;
   onEvidence: (id: string) => void;
-  onMemory?: (id: string) => void;
+  onMemory?: (memoryId: string) => void;
 }
 
 export function AnswerCard({ result, onEvidence, onMemory }: Props) {
   const { answer, verification, facts, decomposition, sampleDataNote } = result;
   const verified = verification.passed && verification.mode === "llm";
   const template = verification.mode === "template";
+  const recallLine = recallSummaryLine(result);
+
+  const openMemory = (chip: string) => {
+    const id = memoryIdFromChip(facts, chip);
+    if (id) onMemory?.(id);
+  };
 
   return (
     <section className="answer-card" aria-label="Answer">
       <div className="answer-head">
-        <h2>{answer.headline}</h2>
+        <h2>{sentenceCaseHeadline(answer.headline)}</h2>
         {verified && (
           <span className="verify-badge ok">Verified: every figure matches its source</span>
         )}
@@ -25,6 +32,8 @@ export function AnswerCard({ result, onEvidence, onMemory }: Props) {
           <span className="verify-badge warn">Verification incomplete</span>
         )}
       </div>
+
+      {recallLine && <p className="recall-banner">{recallLine}</p>}
 
       <Waterfall decomposition={decomposition} facts={facts} />
 
@@ -37,7 +46,7 @@ export function AnswerCard({ result, onEvidence, onMemory }: Props) {
             factIds={s.facts}
             facts={facts}
             onEvidence={onEvidence}
-            onMemory={onMemory}
+            onMemory={openMemory}
           />
         ))}
       </div>

@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { askQuestion, fetchStatus, simulateProgress } from "./api/client";
+import {
+  askQuestion,
+  fetchAnswer,
+  fetchAnswers,
+  fetchStatus,
+  simulateProgress,
+} from "./api/client";
 import { AnswerCard } from "./components/AnswerCard";
 import { EvidenceDrawer } from "./components/EvidenceDrawer";
 import { Header } from "./components/Header";
+import { HowAnswerMade } from "./components/HowAnswerMade";
 import { HowItWorks } from "./components/HowItWorks";
 import { MemoryPanel } from "./components/MemoryPanel";
 import { OfflineNotice } from "./components/OfflineNotice";
 import { QuestionBox } from "./components/QuestionBox";
+import { RecentAnswers } from "./components/RecentAnswers";
 import { RecommendationCard } from "./components/RecommendationCard";
 import { RuledOut } from "./components/RuledOut";
 import {
@@ -16,7 +24,14 @@ import {
   type TimelineState,
 } from "./components/Timeline";
 import { FIXTURES, matchFixture, sitesFromFixtures, SUGGESTED_QUESTIONS } from "./fixtures";
-import type { ApiStatus, Evidence, InvestigateOutcome, InvestigationResult } from "./types";
+import { recallSummaryLine } from "./format";
+import type {
+  AnswerListItem,
+  ApiStatus,
+  Evidence,
+  InvestigateOutcome,
+  InvestigationResult,
+} from "./types";
 import { isClarification } from "./types";
 
 type Theme = "light" | "dark";
@@ -41,6 +56,8 @@ export default function App() {
   const [result, setResult] = useState<InvestigationResult | null>(null);
   const [clarification, setClarification] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<AnswerListItem[]>([]);
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
 
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [memoryFocus, setMemoryFocus] = useState<string | null>(null);
@@ -49,6 +66,22 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  const refreshRecent = useCallback(async () => {
+    try {
+      const list = await fetchAnswers();
+      setRecent(list);
+    } catch {
+      setRecent(
+        FIXTURES.map((f) => ({
+          slug: f.slug,
+          question: f.question,
+          headline: f.result.answer.headline,
+          generatedAt: f.result.generatedAt,
+        })),
+      );
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +92,7 @@ export default function App() {
         setStatus(s);
         setApiOnline(true);
         setOfflineDemo(false);
+        await refreshRecent();
       } catch {
         if (cancelled) return;
         setApiOnline(false);
@@ -68,14 +102,15 @@ export default function App() {
           meterless: { status: "offline", baseUrl: null },
           fallback: { enabled: true },
         });
-        // Seed first fixture so the page isn't empty offline
         setResult(FIXTURES[0].result);
+        setActiveSlug(FIXTURES[0].slug);
+        await refreshRecent();
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshRecent]);
 
   const evidenceMap = useMemo(() => {
     const m = new Map<string, Evidence>();
@@ -85,13 +120,15 @@ export default function App() {
 
   const openEvidence = useCallback((id: string) => setDrawerId(id), []);
 
-  const applyOutcome = useCallback((outcome: InvestigateOutcome) => {
+  const applyOutcome = useCallback((outcome: InvestigateOutcome, slug?: string | null) => {
     if (isClarification(outcome)) {
       setClarification(outcome.clarification);
       setResult(null);
+      setActiveSlug(null);
     } else {
       setClarification(null);
       setResult(outcome);
+      if (slug !== undefined) setActiveSlug(slug);
     }
   }, []);
 
@@ -105,7 +142,8 @@ export default function App() {
       setOfflineDemo(true);
       setTimeline(emptyTimeline());
       await simulateProgress(fixture, (ev) => setTimeline((t) => reduceTimeline(t, ev)));
-      applyOutcome(fixture);
+      const entry = FIXTURES.find((f) => f.result === fixture || f.question === fixture.question);
+      applyOutcome(fixture, entry?.slug ?? null);
     },
     [applyOutcome],
   );
@@ -122,6 +160,7 @@ export default function App() {
     setClarification(null);
     setTimeline(emptyTimeline());
     setDrawerId(null);
+    setActiveSlug(null);
 
     try {
       if (!apiOnline) {
@@ -135,15 +174,16 @@ export default function App() {
           onProgress: (ev) => setTimeline((t) => reduceTimeline(t, ev)),
           onResult: (outcome) => {
             gotResult = true;
-            applyOutcome(outcome);
+            applyOutcome(outcome, null);
           },
           onError: (msg) => setError(msg),
         },
         ac.signal,
       );
       if (!gotResult && !ac.signal.aborted) {
-        // Stream ended without a result — fall back
         await runOffline(q, site);
+      } else {
+        void refreshRecent();
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
@@ -152,9 +192,38 @@ export default function App() {
     } finally {
       setBusy(false);
     }
-  }, [apiOnline, applyOutcome, busy, question, runOffline, site]);
+  }, [apiOnline, applyOutcome, busy, question, refreshRecent, runOffline, site]);
+
+  const onOpenRecent = useCallback(
+    async (slug: string) => {
+      if (busy) return;
+      setBusy(true);
+      setError(null);
+      setClarification(null);
+      setTimeline(emptyTimeline());
+      setDrawerId(null);
+      try {
+        if (apiOnline) {
+          const a = await fetchAnswer(slug);
+          applyOutcome(a, slug);
+          setQuestion(a.question);
+        } else {
+          const fixture = FIXTURES.find((f) => f.slug === slug);
+          if (!fixture) throw new Error("not found");
+          applyOutcome(fixture.result, slug);
+          setQuestion(fixture.question);
+        }
+      } catch {
+        setError(`Could not load answer “${slug}”.`);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [apiOnline, applyOutcome, busy],
+  );
 
   const drawerEvidence = drawerId ? evidenceMap.get(drawerId) ?? null : null;
+  const recallLine = result ? recallSummaryLine(result) : null;
 
   return (
     <div className="app">
@@ -182,6 +251,13 @@ export default function App() {
           onAsk={() => void onAsk()}
         />
 
+        <RecentAnswers
+          answers={recent}
+          busy={busy}
+          activeSlug={activeSlug}
+          onOpen={(slug) => void onOpenRecent(slug)}
+        />
+
         <Timeline
           state={timeline}
           visible={busy || timeline.evidence.length > 0 || timeline.llmCalls.length > 0}
@@ -206,10 +282,17 @@ export default function App() {
             <AnswerCard result={result} onEvidence={openEvidence} onMemory={setMemoryFocus} />
             <RuledOut items={result.answer.ruledOut} onEvidence={openEvidence} />
             <RecommendationCard result={result} onEvidence={openEvidence} />
+            <HowAnswerMade result={result} apiOnline={apiOnline} />
           </>
         )}
 
-        <MemoryPanel site={site} apiOnline={apiOnline} focusId={memoryFocus} />
+        <MemoryPanel
+          site={site}
+          sites={sites}
+          apiOnline={apiOnline}
+          focusId={memoryFocus}
+          recallLine={recallLine}
+        />
       </main>
 
       <HowItWorks />
