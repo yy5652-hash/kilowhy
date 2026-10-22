@@ -1,0 +1,4 @@
+event_id,site_id,event_date,description
+E1,S2,2026-10-07,SAMPLE: Oven schedule moved 2h later from this date (new sourdough line).
+E2,S3,2026-09-20,SAMPLE: One-off freezer fault; extra kWh consumed all day.
+E3,S1,2026-10-03,SAMPLE: Extra Saturday opening hours from this date.
