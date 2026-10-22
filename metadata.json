@@ -6,13 +6,67 @@
     "meterless": {
       "provider": "Nightshift (Runtime provider contract v4) as primary LLM provider, http://127.0.0.1:8088/v1",
       "engines": {
-        "markovian": "bounded-carryover investigation chunks (planned D3)",
-        "hmem": "user corrections and confirmed causes with provenance (planned D3)",
-        "world-model": "sites, meters, contract, ops events as bitemporal entities (planned D3)"
+        "hmem": {
+          "role": "Investigation memory: notes the owner tells us and causes the agent confirmed, stored with provenance, recalled at the start of the next investigation (each recalled memory is an M# fact the answer may cite), every write and read audited in the trust ledger",
+          "version": "vendor/meterless/hmem (reference implementation, Apache-2.0)",
+          "used_in": [
+            { "file": "server/src/memory.ts", "functions": ["KilowhyMemory.remember (MemoryMiningService)", "KilowhyMemory.recall (MemoryRetrievalService, semantic term from provider.embed)", "KilowhyMemory.audit (TrustLedgerService.history)", "KilowhyMemory.feedback"] },
+            { "file": "server/src/memory_confirm.ts", "functions": ["confirmCauses (supported causes written back with evidence ids, Zetaris run ids and Nightshift receipt ids)"] },
+            { "file": "server/src/agent.ts", "functions": ["investigate (recall at the start, M# facts, plan prompt, write at the end)"] },
+            { "file": "server/src/agent_memory.ts", "functions": ["recallFor", "memoryReport"] }
+          ],
+          "see_it_work": [
+            "node scripts/note.ts --site S2 \"Brixton moved its oven schedule 2 hours later from 7 Oct for the new sourdough line\"",
+            "node scripts/ask.ts \"Why did Brixton use more electricity?\"  (before and after the note)",
+            "node scripts/note.ts --audit mem-1",
+            "node scripts/note.ts --recall \"Why did Brixton use more electricity?\" --site S2",
+            "UI: memory panel (notes with provenance and ledger)"
+          ],
+          "store": "data/cache/hmem/ (state.json, ledger.jsonl, vectors.json; git-ignored)"
+        },
+        "world-model": {
+          "role": "Grounded entities read from Zetaris: sites (with aliases such as Brixton), meters, contract, the Agile tariff and the flat comparison tariff, ops_log events as bitemporal edges and facts, each with provenance {view, zetarisRunId, at}; resolves the site a question names; re-ingest is idempotent",
+          "version": "vendor/meterless/world-model (reference implementation, Apache-2.0)",
+          "used_in": [
+            { "file": "server/src/worldmodel.ts", "functions": ["KilowhyWorld.ingest", "KilowhyWorld.resolveSite", "KilowhyWorld.mentionedSites", "KilowhyWorld.factsFor (events in a window)"] },
+            { "file": "server/src/worldmodel_ingest.ts", "functions": ["ingestFromData (upsertEntity, relate, assertFact)"] },
+            { "file": "server/src/worldmodel_resolve.ts", "functions": ["resolveSite, mentionedSites (the engine's 0.85 / 0.82 resolve bands via nameSimilarity and decide)"] },
+            { "file": "server/src/agent.ts", "functions": ["investigate (sites step: ingest, then the site a question names is resolved through the world; an unknown site becomes a clarification)"] },
+            { "file": "server/src/hypotheses/util.ts", "functions": ["addWorldEvents (the World Model's event count on the H4, H5 and H11 evidence)"] }
+          ],
+          "see_it_work": [
+            "node scripts/worldmodel_check.ts  (ingest twice from Zetaris: empty diff, entity/fact counts, resolutions)",
+            "node scripts/worldmodel_check.ts --mutate  (proof that the check can fail)",
+            "UI: entities list"
+          ],
+          "store": "data/cache/worldmodel/.world/kilowhy.json when run with --local or through scripts/ask.ts (git-ignored)"
+        },
+        "markovian": {
+          "role": "The LLM part of an investigation as bounded chunks run by the engine's orchestrator: plan, interpret the hypothesis results in batches, narrative, verify; a compact JSON carryover (scope, hypothesis table, evidence ids, readings, open questions) is all that travels between chunks; tokens per chunk are logged against the reference's naive full-history estimate",
+          "version": "vendor/meterless/markovian (reference implementation, Apache-2.0)",
+          "used_in": [
+            { "file": "server/src/investigate_markovian.ts", "functions": ["runMarkovianChain (Markovian.run with one stepFn per chunk kind)", "interpretTargets"] },
+            { "file": "server/src/markovian_state.ts", "functions": ["fitState (keeps the carryover inside the 800-token budget)"] },
+            { "file": "server/src/markovian_log.ts", "functions": ["chunkTokens", "withNaive", "totalsOf (estimated and measured tokens, naive baseline)"] },
+            { "file": "server/src/agent.ts", "functions": ["investigate (option engine: \"markovian\" by default, \"plain\" for the single plan + narrative loop)"] }
+          ],
+          "see_it_work": [
+            "node scripts/ask.ts \"Why did Brixton use more electricity?\"  (prints the chain: chunk, seconds, input tokens, naive tokens, carryover)",
+            "eval/markovian_tokens.json  (per-chunk token log of every run)",
+            "node scripts/markovian_latency.ts  (plain loop against the chain, live)",
+            "UI: chain view"
+          ],
+          "log": "eval/markovian_tokens.json"
+        },
+        "check": "node scripts/engines_check.ts  (each engine's own test suite: npm install + npm test in vendor/meterless/<engine>/reference)"
       }
     },
-    "nvidia": "Nemotron models via Nightshift, direct NVIDIA API as labelled secondary route",
+    "nvidia": "Nemotron models via Nightshift, direct NVIDIA API as labelled secondary route; Nemotron embed 1B (provider.embed, labelled route) for H-MEM recall",
     "cursor": "Cursor CLI used for generator and UI components; transcripts in docs/cursor-log/"
   },
-  "pre_existing_open_source": ["meterless engines (Apache-2.0) vendored under vendor/ in D3"]
+  "pre_existing_open_source": [
+    "Meterless H-MEM engine, vendor/meterless/hmem (Apache-2.0, https://github.com/Meterless/Meterless, commit 1742dec56a66e58eef9dda2d2b865823758ca8cd)",
+    "Meterless World Model engine, vendor/meterless/world-model (Apache-2.0, same commit)",
+    "Meterless Markovian engine, vendor/meterless/markovian (Apache-2.0, same commit)"
+  ]
 }

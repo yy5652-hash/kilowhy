@@ -88,3 +88,19 @@ node scripts/ask.ts "What should we change to save money?"           # prints ro
 node scripts/reasoning_probe.ts --repeats 3 --cap 3000 --only baseline,kwargs_enable_thinking          # Meterless
 node scripts/reasoning_probe.ts --repeats 2 --direct --cap 3000 --out reasoning_probe_direct_cap3000    # NVIDIA direct
 ```
+
+## D3: the Markovian chain (measured 2026-10-22)
+
+`investigate()` runs the LLM part as Markovian chunks by default (plan, interpret the hypothesis results in batches, narrative, verify; `server/src/investigate_markovian.ts`). `scripts/markovian_latency.ts` ran the plain loop and the chain with 3, 5 and 9 hypotheses per interpret chunk, twice on each of two questions plus one more Brixton run, one after the other on the live stack; raw rows and the summary are in `eval/latency/markovian_d3.json`. Every run verified by the model on the first attempt except one (two attempts, chain with batches of 3).
+
+| setting | runs | total, mean (median) | interpret chunks, mean | cold first runs (all sites / Brixton) |
+|---|---|---|---|---|
+| plain loop | 5 | 34.5 s (33.9) | none | 33.9 s / 52.5 s |
+| chain, 3 per chunk (3 chunks) | 5 | 90.0 s (81.9) | 25.4 s | 74.7 s / 91.9 s |
+| chain, 5 per chunk (2 chunks) | 5 | 66.0 s (66.5) | 22.8 s | 66.5 s / 69.6 s |
+| chain, 9 per chunk (1 chunk) | 5 | 77.8 s (77.2) | 17.1 s | 87.4 s / 58.4 s |
+
+- An interpret call takes 6-12 s: Nightshift is asked first, the labelled NVIDIA call joins after 8 s and usually answers in 1.5-9 s.
+- The spec's batches of 3 add 19-31 s per question for the interpret chunks and finished about 40 s after the plain loop on cold runs; batches of 5 add 20-28 s and about 25 s. The default is therefore 5 (`BATCH_SIZE`); `markovian.batchSize` restores 3.
+- In the repeat-2 rows Nightshift answered the plain loop's identical narrative prompt from its response cache (see above), so those plain times understate the model time; repeat 1 is the like-for-like comparison.
+- Tokens (estimated = chars / 4, measured = provider-reported): the chain with batches of 5 sent about 4,300 estimated input tokens per question against about 8,300 for the naive full-history version of the same chain (`naiveInputTokensEstimatedMean`).
