@@ -45,7 +45,7 @@ const VIEW_COLUMNS: Record<string, string> = {
   agile_rates: "slot_start, p_kwh_inc_vat", ci_london: "slot_start, forecast_gco2_kwh, wind_pct, gas_pct, imports_pct", fuel_hh: "slot_start, fuel_type, mw", temp_hourly: "ts, temp_c",
   meter_hh: "site_id, ts, kwh (SAMPLE data)", sites: "site_id, name", ops_log: "site_id, event_date, description", contract: "standing_charge_p_per_day, valid_from", agile_standing: "valid_from, p_day_inc_vat", flat_tariff: "valid_from, p_kwh_exc_vat",
 };
-export interface PlanInput { question: string }
+export interface PlanInput { question: string; memories?: string }   // memories: snippets recalled from H-MEM (memorySnippets), "" or absent for none
 export const PLAN_MAX_TOKENS = 1200;
 export function planMessages(i: PlanInput): ChatMessage[] {
   return [
@@ -56,7 +56,7 @@ Reply with ONE JSON object and nothing else: {"hypotheses": ["H3", "H1", ...], "
 - "extraSql": [] unless one specific figure is missing. At most ONE item {"purpose": "...", "sql": "SELECT ..."}: a single read-only Spark SQL SELECT over kilowhy.<view> with LIMIT <= 5000 (CAST(x AS DATE), timestamp '2026-09-24 00:00:00' literals; no :: casts, no INTERVAL strings, no subqueries in WHERE). Window A is 2026-08-27 to 2026-09-23, window B is 2026-09-24 to 2026-10-21.
 Catalog: ${CATALOG.map((c) => `${c.id} ${c.title}`).join("; ")}.
 Views: ${ALLOWED_VIEWS.map((v) => `${v}(${VIEW_COLUMNS[v] ?? ""})`).join("; ")}. Most questions need no extra query: answer [] and be quick.` },
-    { role: "user", content: `Order the tests for this question: ${i.question}` },
+    { role: "user", content: `Order the tests for this question: ${i.question}${i.memories ? `\nNotes remembered from earlier (H-MEM); put the tests they bear on first:\n${i.memories}` : ""}` },
   ];
 }
 export interface PlanReply { hypotheses: string[]; extraSql: { purpose: string; sql: string }[] }
@@ -113,7 +113,8 @@ Rules:
 3. "ruledOut": one short item per ruled_out hypothesis worth a mention (at most four), with its id and at least one placeholder. Nothing else goes there.
 4. "recommendation": one or two sentences using the REC facts. ${i.hasRecommendation ? "A flat-tariff comparison must be called a historical counterfactual, not advice." : "There are no REC facts, so leave the text empty."}
 5. Say what each fact says, no more: do not give a figure a cause its description does not name. The data are synthetic SAMPLE meter readings; do not call them real measurements.
-6. "headline": one short line; placeholders allowed.
+6. "headline": one short line; placeholders allowed.${i.facts.some((f) => f.memory) ? `
+7. Facts whose id starts with M are notes remembered from earlier (the owner's, or an earlier investigation's). Cite one with its placeholder, for example {M1}, in the same sentence or ruled-out item as the test result it explains, never on its own; it may explain why a change happened but it is never a source of figures. If the test it bears on is not supported, mention it only in a ruledOut item for that test.` : ""}
 Hypotheses:
 ${statuses}
 Facts (id [hypothesis] description = value):

@@ -5,8 +5,8 @@ import { tokenize } from "./verifier.ts";
 import { displayFor } from "./facts_format.ts";
 import type { Fact } from "./facts.ts";
 
-/** {F3}, [F3], <F3>, {{F3}}, {F3:abs} and a bare F3 all mean the same placeholder. */
-const PH = /(?:[{[<]{1,2}\s*)?\bF(\d+)\b(?:\s*:\s*(abs|magnitude))?(?:\s*[}\]>]{1,2})?/gi;
+/** {F3}, [F3], <F3>, {{F3}}, {F3:abs} and a bare F3 all mean the same placeholder; M1 is the same for a remembered note. */
+const PH = /(?:[{[<]{1,2}\s*)?\b([FM])(\d+)\b(?:\s*:\s*(abs|magnitude))?(?:\s*[}\]>]{1,2})?/gi;
 /** Identifiers that may stay as written: hypothesis ids and site ids (E# evidence markers are dropped by the caller). */
 const ALLOWED_ID = /\b[HSE]\d+\b|\b(?:kg|g)?CO2e?\b|CO\u2082e?/g;   // plus unit names that contain a digit (kgCO2e)
 
@@ -84,9 +84,9 @@ export function renderPlaceholders(raw: string, byId: Map<string, Fact>, where: 
   const stray = strayDigits(source).map((w) => restore(w, kept));
   if (stray.length) errors.push(`${where}: digits written outside placeholders (${stray.slice(0, 4).map((s) => `"${s}"`).join(", ")}); write the fact's placeholder such as {F3} instead, and spell out small counts in words`);
   const facts: string[] = [];
-  const rendered = source.replace(PH, (_m, n: string, abs?: string) => {
-    const f = byId.get(`F${n}`);
-    if (!f) { errors.push(`${where}: placeholder {F${n}} does not exist in the facts table`); return ""; }
+  const rendered = source.replace(PH, (_m, letter: string, n: string, abs?: string) => {
+    const f = byId.get(`${letter.toUpperCase()}${n}`);
+    if (!f) { errors.push(`${where}: placeholder {${letter.toUpperCase()}${n}} does not exist in the facts table`); return ""; }
     if (!facts.includes(f.id)) facts.push(f.id);
     return abs ? magnitude(f) : f.display;
   });

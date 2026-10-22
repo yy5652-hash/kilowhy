@@ -34,8 +34,8 @@ const signOf = (s: string | undefined): -1 | 0 | 1 => (!s ? 0 : s === "+" ? 1 : 
 const parseNum = (s: string): { value: number; decimals: number } => ({ value: Number(s.replace(/,/g, "")), decimals: s.includes(".") ? s.length - s.indexOf(".") - 1 : 0 });
 const monthIndex = (m: string): number => MONTHS.indexOf(m.slice(0, 3).toLowerCase()) + 1;
 
-/** Identifiers that look like numbers but are not: [E3], F12, H10, S2. Blanked out (same length) before tokenising. */
-const ID_RE = /\[?\b[EFHS]\d+\b\]?/g;
+/** Identifiers that look like numbers but are not: [E3], F12, M1, H10, S2. Blanked out (same length) before tokenising. */
+const ID_RE = /\[?\b[EFHMS]\d+\b\]?/g;
 
 export function tokenize(text: string): Token[] {
   const clean = text.replace(ID_RE, (m) => " ".repeat(m.length));

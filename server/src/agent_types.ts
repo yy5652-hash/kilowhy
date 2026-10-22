@@ -64,6 +64,13 @@ export interface InvestigationResult {
   timings: Timings;
   notes: string[];
   sampleDataNote: string;
+  memory?: MemoryReport;                      // present when the investigation ran with H-MEM
+}
+/** What H-MEM did in this investigation: memories recalled at the start (each is an M# fact) and causes written at the end. */
+export interface MemoryReport {
+  query: string; embedRoute: string; recallMs: number;
+  recalled: { id: string; factId: string; relevance: number; origin: "user" | "agent"; site?: string; learnedAt: string; text: string; citedIn: number }[];   // citedIn: answer items that cite its M#
+  written: { id: string; hypothesis: string; text: string; skipped: boolean }[];                                                                                // skipped: the same cause for the same windows was already remembered
 }
 export interface ClarificationResult { question: string; clarification: string; knownSites: { id: string; name: string }[]; llmCalls: LlmCall[]; timings: Timings }
 export type InvestigateOutcome = InvestigationResult | ClarificationResult;

@@ -18,9 +18,11 @@ export interface Fact {
   value: FactValue;           // number in the unit of `unit` (percent as 54.91, pounds as 339.91), or text / date string
   unit: string;               // GBP | % | kWh | p/kWh | kgCO2e | pp | sd | HDD | date | text | ...
   display: string;            // the string the narrative must copy: £339.91, 54.9%, 8,312 kWh, 21.4 p/kWh, 103.0 kgCO2e, 2026-10-17
-  evidence: string;           // E# the value comes from
+  evidence: string;           // E# the value comes from ("" for a remembered note)
   hypothesis?: string;        // H1..H11 when the fact belongs to one hypothesis; REC for the recommendation; absent for neutral facts
+  memory?: FactMemory;        // M# facts only: a memory recalled from H-MEM (it has no E#: evidence is "")
 }
+export interface FactMemory { id: string; origin: "user" | "agent"; site?: string; learnedAt: string; validFrom?: string; confidence: number; relevance: number }
 
 export interface FactsInput {
   scope: Scope;

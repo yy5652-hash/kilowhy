@@ -19,7 +19,7 @@ function say(strings: TemplateStringsArray, ...vals: Part[]): AnswerItem {
     else { used.push(v.fact); text += v.text; }
     text += strings[i + 1];
   });
-  return { text: dot(text), facts: [...new Set(used.map((f) => f.id))], evidence: [...new Set(used.map((f) => f.evidence))] };
+  return { text: dot(text), facts: [...new Set(used.map((f) => f.id))], evidence: [...new Set(used.map((f) => f.evidence).filter(Boolean))] };
 }
 const join = (...items: (AnswerItem | null)[]): AnswerItem => {
   const xs = items.filter((x): x is AnswerItem => !!x);
@@ -34,6 +34,8 @@ export function templateAnswer(facts: Fact[], hyps: HypInfo[], type: IntentType)
   /** Runs `fn` with the facts of `keys` when all of them exist, else null. */
   const when = (keys: string[], fn: (g: Fact[]) => AnswerItem): AnswerItem | null => { const g = keys.map(get); return g.every((f) => f) ? fn(g as Fact[]) : null; };
   const status = (id: string) => hyps.find((h) => h.id === id)?.status;
+  /** The owner's remembered note for a site (or for all sites), as a sentence part: it explains a change the tests found, it adds no figure. */
+  const noteFor = (siteId: unknown): AnswerItem | null => { const m = facts.find((f) => f.memory?.origin === "user" && (!f.memory.site || f.memory.site === siteId)); return m ? say`Your note on file says ${m}.` : null; };
   const sgn = (k: string, pos: string, neg: string): string => (num(k) >= 0 ? pos : neg);
   const dC = num("delta_bill");
   const spike = type === "why_spike_day";
@@ -52,7 +54,8 @@ export function templateAnswer(facts: Fact[], hyps: HypInfo[], type: IntentType)
   const steps = facts.filter((x) => /^event_\d+_t$/.test(x.key) && Math.abs(Number(x.value)) >= 2).map((x) => x.key.match(/\d+/)![0]);
   cause("H4", Math.abs(num("v_operational_share")), "mainly because of a change in how the sites operate", when(["v_operational", "v_operational_share"], (g) =>
     join(say`Usage that weather does not explain ${sgn("v_operational", "added", "cut")} ${mag(g[0])} (${mag(g[1])} of the change).`,
-      ...steps.map((k) => when([`event_${k}_site`, `event_${k}`, `event_${k}_date`], (e) => say`A logged event at ${e[0]} from ${e[2]} fits: ${e[1]}`)))));
+      ...steps.map((k) => when([`event_${k}_site`, `event_${k}`, `event_${k}_date`], (e) => say`A logged event at ${e[0]} from ${e[2]} fits: ${e[1]}`)),
+      ...steps.slice(0, 1).map((k) => noteFor(String(get(`event_${k}_site`)?.value ?? "").split(" ")[0])))));
   cause("H5", Math.abs(num("T_share")), "mainly because usage moved to dearer times of day", when(["T", "T_share"], (g) =>
     say`Moving usage between cheaper and dearer times of day ${sgn("T", "added", "cut")} ${mag(g[0])} (${mag(g[1])} of the change).`));
   cause("H6", Math.abs(num("top_day_share")) * 0.9, "largely because of one day", when(["top_day", "top_day_share", "top_day_delta"], (g) =>
@@ -96,6 +99,7 @@ export function templateAnswer(facts: Fact[], hyps: HypInfo[], type: IntentType)
     !(Math.abs(num("schedule_delta_pp")) >= 10 || get("schedule_event")) ? null : when(["schedule_site", "schedule_band", "schedule_delta_pp", "schedule_change_date"], (s) => join(
       say`The daily pattern at ${s[0]} did move: its ${s[1]} share changed by ${mag(s[2])} from ${s[3]}`,
       when(["schedule_event"], (e) => say`This matches a logged event: ${e[0]}`),
+      noteFor(s[0].value),
       say`At these prices that did not change the bill materially.`)))));
   out("H6", when(["top_day", "top_day_share"], (g) => say`A one-off day is ruled out: the largest single day, ${g[0]}, accounts for only ${g[1]} of the change.`));
   out("H7", when(["meter_faults", "meter_sites_checked"], (g) => say`Meter faults are ruled out: ${g[0]} zero runs, flatlines, duplicate timestamps or incomplete days were found across ${g[1]} sites.`));

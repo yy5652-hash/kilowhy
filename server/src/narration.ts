@@ -29,7 +29,7 @@ export function answerFromReply(reply: ReplyShape, facts: Fact[], hyps: HypInfo[
     }
     errors.push(...r.errors); repairs.push(...r.repairs);
     if (r.errors.length) return null;
-    const ev = new Set(r.facts.map((id) => byId.get(id)!.evidence));
+    const ev = new Set(r.facts.map((id) => byId.get(id)!.evidence).filter(Boolean));   // a remembered note (M#) has no evidence of its own
     for (const e of evidenceList(given)) if (evidenceIds.has(e)) ev.add(e);
     return { text: r.text, facts: r.facts, evidence: [...ev] };
   };

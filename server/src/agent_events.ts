@@ -3,12 +3,14 @@
 import type { Evidence } from "./evidence.ts";
 import type { LlmCall } from "./agent_types.ts";
 
-export type StepName = "sites" | "intent" | "plan" | "data" | "hypotheses" | "recommend" | "extraSql" | "facts" | "narrative" | "template";
+export type StepName = "sites" | "intent" | "plan" | "data" | "hypotheses" | "recommend" | "extraSql" | "facts" | "narrative" | "template" | "memory";
 export type ProgressEvent =
   | { type: "step"; step: StepName; status: "started" | "finished"; ms?: number }
   | { type: "evidence"; evidence: { id: string; hypothesisId: string; title: string; rowCount: number; zetarisRunId: string; sources: Evidence["sources"] } }
   | { type: "hypothesis"; id: string; name: string; status: string }
   | { type: "llm"; call: LlmCall }
+  | { type: "memory"; action: "recall"; query: string; count: number; ids: string[]; route: string; ms: number }                // H-MEM recall at the start
+  | { type: "memory"; action: "write"; written: { id: string; hypothesis: string }[]; skipped: number }                  // confirmed causes written after the answer
   | { type: "reset"; reason: string }   // the speculative data work was for a different scope: clear evidence and hypotheses shown so far
   | { type: "done"; totalMs: number };
 

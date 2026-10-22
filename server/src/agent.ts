@@ -7,6 +7,10 @@
 import { chat as providerChat } from "./provider.ts";
 import { createZetarisData, type DataLayer, type ZSql } from "./data.ts";
 import { KilowhyWorld } from "./worldmodel.ts";
+import type { KilowhyMemory, Recall } from "./memory.ts";
+import { memoryFacts, memorySnippets } from "./memory_facts.ts";
+import { confirmCauses, type WrittenMemory } from "./memory_confirm.ts";
+import { memoryReport, recallFor } from "./agent_memory.ts";
 import { CATALOG, HYPOTHESIS_IDS } from "./hypotheses/index.ts";
 import type { HypothesisId } from "./hypotheses/types.ts";
 import { WINDOW_A, WINDOW_B, type DateWindow } from "./windows.ts";
@@ -28,6 +32,7 @@ import { SAMPLE_NOTE, type ClarificationResult, type DecompositionSummary, type 
 export interface InvestigateOpts {
   zsql?: ZSql;                    // Zetaris runner: needed for the planner's extra SQL and, without `data`, to build the data layer
   data?: DataLayer;               // default: createZetarisData(zsql)
+  memory?: KilowhyMemory;         // H-MEM: recalled at the start (M# facts, plan prompt), confirmed causes written at the end; default: no memory
   world?: KilowhyWorld;           // the World Model (sites, aliases, ops_log events); default: a new in-memory one, ingested from `data` at the start
   chat?: ChatFn;                  // default: the Meterless/NVIDIA provider
   site?: string;                  // restrict to one site (id or name); overrides the sites found in the question
@@ -56,10 +61,10 @@ const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((
 /** Sorts ids numerically, removes duplicates, and adds the evidence of every cited fact so each sentence is traceable to its source queries. */
 export function normalizeAnswer(a: Answer, facts: Fact[], hyps: HypInfo[]): Answer {
   const byId = new Map(facts.map((f) => [f.id, f]));
-  const order = (x: string) => Number(x.slice(1)) || 0;
+  const order = (x: string) => (x[0] === "M" ? 1e6 : 0) + (Number(x.slice(1)) || 0);
   const fix = <T extends AnswerItem>(it: T): T => {
     const fs = [...new Set(it.facts)].filter((id) => byId.has(id)).sort((x, y) => order(x) - order(y));
-    const es = [...new Set([...it.evidence, ...fs.map((id) => byId.get(id)!.evidence)])].sort((x, y) => order(x) - order(y));
+    const es = [...new Set([...it.evidence, ...fs.map((id) => byId.get(id)!.evidence)])].filter(Boolean).sort((x, y) => order(x) - order(y));   // a remembered note (M#) has no evidence of its own
     return { ...it, text: ONE_LINE(it.text), facts: fs, evidence: es };
   };
   return {
@@ -86,9 +91,11 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   const total = () => Math.round(performance.now() - t0);
   const clarify = (text: string, known: SiteRef[]): ClarificationResult => ({ question, clarification: text, knownSites: known, llmCalls: [...calls], timings: { ...timings, total: total() } });
 
-  // The plan sees only the question, so its call starts at once and overlaps everything else.
-  const planP = timed(emit, timings, "plan", () => askJson(env, "plan", "deep", planMessages({ question }), checkPlan, { maxTokens: PLAN_MAX_TOKENS, deadlineMs: deadline.plan, hedgeAfterMs: hedge.plan }));
-  planP.catch(() => {});
+  // The plan sees only the question (and, with H-MEM, the notes recalled for the sites it mentions), so its call starts at once without memory and right after the recall with it; either way it overlaps the data work.
+  const startPlan = (memories = "") =>
+    timed(emit, timings, "plan", () => askJson(env, "plan", "deep", planMessages({ question, memories }), checkPlan, { maxTokens: PLAN_MAX_TOKENS, deadlineMs: deadline.plan, hedgeAfterMs: hedge.plan }));
+  const earlyPlanP = opts.memory ? null : startPlan();
+  earlyPlanP?.catch(() => {});
 
   // ---- 1. sites and intent; data work starts on the scope the question text implies, without waiting for the model
   const world = opts.world ?? KilowhyWorld.create();
@@ -96,6 +103,10 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   const intentP = timed(emit, timings, "intent", () => askJson(env, "intent", "auto", intentMessages(question, known), checkIntent, { maxTokens: INTENT_MAX_TOKENS, deadlineMs: deadline.intent, hedgeAfterMs: hedge.intent }));
   const guess = guessSites(question, known, opts.site);
   const label = (ids: string[]) => (ids.length === known.length ? "ALL" : ids.join("+"));
+  let recall: Recall | null = null;
+  const recallP = opts.memory ? recallFor(opts.memory, question, guess, known, emit) : null;
+  const planP = earlyPlanP ?? recallP!.then((r) => { recall = r; return startPlan(memorySnippets(memoryFacts(r, guess))); });
+  planP.catch(() => {});
   const specTimings: Record<string, number> = {};
   const specP = runScope({ data, siteIds: guess, label: label(guess), windowA, windowB, emit, timings: specTimings, world });
   specP.catch(() => {});
@@ -140,12 +151,17 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   const extraSql = await timed(emit, timings, "extraSql", () => runExtraSql(pr.value?.extraSql ?? [], opts.zsql, evidence));
   const plan: Plan = { hypotheses: [...base, ...added], added, dropped, extraSql, rationale: pr.value ? "ordered by the model" : late ? "default order (the model's plan arrived too late)" : "default order (the model's plan was unusable)", source: pr.value ? "llm" : "default" };
 
-  // ---- 5. facts
+  // ---- 5. facts (+ the M# facts of the memories H-MEM recalled; a final scope that differs from the first guess gets its own recall)
+  if (recallP) {
+    recall = await recallP;
+    if (!sameIds(scope.siteIds, guess)) { recall = await recallFor(opts.memory!, question, scope.siteIds, known, emit); notes.push(`memory recalled again for ${scope.label}: the scope changed after the intent`); }
+  }
+  const memFacts = memoryFacts(recall, scope.siteIds);
   const siteNames = Object.fromEntries(known.map((s) => [s.id, s.name]));
-  const facts = await timed(emit, timings, "facts", async () => buildFacts({
+  const facts = [...(await timed(emit, timings, "facts", async () => buildFacts({
     scope: ctx.scope, siteNames, windowA, windowB, decomposition: dec, results, evidence, rec: loadShift, tariff,
     extras: extraSql.filter((x) => x.status === "ran" && x.evidence).map((x) => ({ purpose: x.purpose, evidence: x.evidence!, rows: x.rows ?? 0 })),
-  }));
+  }))), ...memFacts];
   const rank = (id: string) => plan.hypotheses.indexOf(id as HypothesisId);
   const hyps: HypInfo[] = results.map((x) => ({ id: x.id, name: x.name, status: x.status })).sort((x, y) => rank(x.id) - rank(y.id));
   const vctx: VerifyCtx = { facts, evidenceIds: evidence.list().map((e) => e.id), hypotheses: hyps, requireRecommendation: facts.some((f) => f.hypothesis === "REC") };
@@ -165,13 +181,19 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
     const tv = verifyAnswer(answer, vctx);
     verification = { passed: tv.passed, attempts: nr.attempts, errors: [...nr.lastErrors, ...tv.errors.map((e) => `template: ${errorLine(e)}`)], errorDetail: [...nr.lastDetail, ...tv.errors], history: nr.history, repairs: [], mode: "template" };
   }
-  timings.total = total();
-  emit({ type: "done", totalMs: timings.total });
-
   const decomposition: DecompositionSummary = { ok: dec.ok, error: dec.error, result: dec.result, standing: dec.standing, vatRate: dec.vatRate, evidenceId: dec.evidenceId, contractEvidenceId: dec.contractEvidenceId, warnings: dec.warnings, slotsAligned: dec.aligned.kept, slotsExpected: dec.aligned.expected };
   const out: InvestigationResult = {
     question, intent, scope: { label: scope.label, sites: scope.siteIds.map((id) => ({ id, name: siteNames[id] })), windowA, windowB }, decomposition, plan, results, evidence: evidence.list(), facts,
     recommendation: { loadShift, tariff }, answer, verification, llmCalls: [...calls], timings, notes, sampleDataNote: SAMPLE_NOTE,
   };
+  // ---- H-MEM: the supported causes are written to memory with their provenance (after the answer, so the answer never waits on a failed write)
+  if (opts.memory) {
+    let written: WrittenMemory[] = [];
+    try { written = await timed(emit, timings, "memory", () => confirmCauses(opts.memory!, out)); } catch (e) { notes.push(`memory write failed: ${e instanceof Error ? e.message : e}`); }
+    emit({ type: "memory", action: "write", written: written.filter((w) => !w.skipped).map((w) => ({ id: w.id, hypothesis: w.hypothesis })), skipped: written.filter((w) => w.skipped).length });
+    out.memory = memoryReport(recall, memFacts, answer, written);
+  }
+  timings.total = total();
+  emit({ type: "done", totalMs: timings.total });
   return out;
 }

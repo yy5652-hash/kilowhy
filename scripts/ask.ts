@@ -6,11 +6,16 @@ import { zsql } from "./zetaris_client.ts";
 import { investigate } from "../server/src/agent.ts";
 import { renderOutcome } from "../server/src/agent_render.ts";
 import { answerFile, parseArgs } from "./ask_args.ts";
+import { defaultMemory, WORLD_DIR } from "../server/src/memory_default.ts";
+import { KilowhyWorld } from "../server/src/worldmodel.ts";
 
 const { question, site } = parseArgs(process.argv.slice(2));
 if (!question) { console.error('usage: node scripts/ask.ts "question" [--site S2]'); process.exit(2); }
 
-const outcome = await investigate(question, { zsql, site, onProgress: (m) => process.stderr.write(`  ... ${m}\n`) });
+// H-MEM (data/cache/hmem) and the World Model (data/cache/worldmodel) persist between questions; --no-memory asks without H-MEM.
+const memory = process.argv.includes("--no-memory") ? undefined : defaultMemory();
+const world = KilowhyWorld.create({ storage: "local", directory: WORLD_DIR });
+const outcome = await investigate(question, { zsql, site, memory, world, onProgress: (m) => process.stderr.write(`  ... ${m}\n`) });
 console.log(renderOutcome(outcome));
 
 const file = answerFile(question, site);
