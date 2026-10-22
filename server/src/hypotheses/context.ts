@@ -5,7 +5,7 @@ import type { ContractRow, DataLayer, SlotRow } from "../data.ts";
 import { EvidenceStore } from "../evidence.ts";
 import { addDays } from "../bands.ts";
 import { slotsInWindow, type DateWindow } from "../windows.ts";
-import type { Aligned, Decomp, HypCtx, Scope, SlotAgg } from "./types.ts";
+import type { Aligned, Decomp, HypCtx, Scope, SlotAgg, WorldEvents } from "./types.ts";
 import { gbp, metricMap } from "./util.ts";
 
 /** Sums kWh over the scope's sites per half-hour and aligns slot i of A with slot i of B; slots missing at any site (or in either window) are dropped. */
@@ -44,7 +44,7 @@ export function contractFor(rows: ContractRow[], w: DateWindow): EffectiveContra
 
 export const toDecompSlots = (s: SlotAgg[], pick: (x: SlotAgg) => number): Slot[] => s.map((x) => ({ ts: x.ts, kwh: x.kwh, p: pick(x) }));
 
-export interface BuildArgs { data: DataLayer; scope: Scope; windowA: DateWindow; windowB: DateWindow; evidence?: EvidenceStore }
+export interface BuildArgs { data: DataLayer; scope: Scope; windowA: DateWindow; windowB: DateWindow; evidence?: EvidenceStore; world?: WorldEvents }
 
 export async function buildContext(args: BuildArgs): Promise<HypCtx> {
   const { data, scope, windowA, windowB } = args;
@@ -77,7 +77,7 @@ export async function buildContext(args: BuildArgs): Promise<HypCtx> {
     }));
     evidence.addMetrics(contractF.evidence.id, metricMap({ standing_A: [standing.A, "p/day/site"], standing_B: [standing.B, "p/day/site"] }));
   }
-  return { scope, sites: scope.sites, windowA, windowB, decomposition: decomp, data, evidence };
+  return { scope, sites: scope.sites, windowA, windowB, decomposition: decomp, data, evidence, ...(args.world ? { world: args.world } : {}) };
 }
 
 /** Same slot fetch as the decomposition (cached by the data layer), with its own evidence record for the calling hypothesis. */

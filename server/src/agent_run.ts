@@ -4,14 +4,14 @@
 import type { DataLayer } from "./data.ts";
 import { EvidenceStore } from "./evidence.ts";
 import { HYPOTHESIS_IDS, buildContext, runHypothesis } from "./hypotheses/index.ts";
-import type { HypCtx, HypothesisResult } from "./hypotheses/types.ts";
+import type { HypCtx, HypothesisResult, WorldEvents } from "./hypotheses/types.ts";
 import { recommend, recommendTariff, type Recommendation, type TariffComparison } from "./recommend.ts";
 import type { DateWindow } from "./windows.ts";
 import { evidenceEvent, timed, type Emit } from "./agent_events.ts";
 
 export interface ScopeRun { ctx: HypCtx; results: HypothesisResult[]; loadShift: Recommendation | null; tariff: TariffComparison | null; notes: string[] }
 
-export async function runScope(a: { data: DataLayer; siteIds: string[]; label: string; windowA: DateWindow; windowB: DateWindow; emit: Emit; timings: Record<string, number> }): Promise<ScopeRun> {
+export async function runScope(a: { data: DataLayer; siteIds: string[]; label: string; windowA: DateWindow; windowB: DateWindow; emit: Emit; timings: Record<string, number>; world?: WorldEvents }): Promise<ScopeRun> {
   const { data, emit, timings } = a;
   const notes: string[] = [];
   const evidence = new EvidenceStore();
@@ -19,7 +19,7 @@ export async function runScope(a: { data: DataLayer; siteIds: string[]; label: s
   const windows = { A: a.windowA, B: a.windowB };
   const ctx = await timed(emit, timings, "data", async () => {
     await data.prefetch?.({ sites: a.siteIds, windows });
-    return buildContext({ data, scope: { label: a.label, sites: a.siteIds }, windowA: a.windowA, windowB: a.windowB, evidence });
+    return buildContext({ data, scope: { label: a.label, sites: a.siteIds }, windowA: a.windowA, windowB: a.windowB, evidence, world: a.world });
   });
   const results: HypothesisResult[] = [];
   if (!ctx.decomposition.ok) return { ctx, results, loadShift: null, tariff: null, notes };

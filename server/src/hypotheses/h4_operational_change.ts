@@ -13,7 +13,7 @@ import { welch } from "../stats.ts";
 import type { OpsEvent } from "../data.ts";
 import type { SlotRow } from "../data.ts";
 import type { DayPoint } from "./weather.ts";
-import { fetchMeta, gbp, metricMap, pctText, result, round, signedGbp, unavailable } from "./util.ts";
+import { addWorldEvents, fetchMeta, gbp, metricMap, pctText, result, round, signedGbp, unavailable } from "./util.ts";
 
 export interface EventTest {
   eventId: string; siteId: string; date: string; description: string;
@@ -70,6 +70,7 @@ export const H4: Hypothesis = {
     const win = { A: ctx.windowA, B: ctx.windowB };
     const daily = await ctx.data.daily({ sites: ctx.sites, windows: win }, fetchMeta(ctx, "H4", `Daily kWh and mean temperature (${ctx.scope.label})`));
     const ops = await ctx.data.opsLog({ sites: ctx.sites }, fetchMeta(ctx, "H4", `ops_log events (${ctx.scope.label})`));
+    addWorldEvents(ctx, ops.evidence.id);
     const total = fitWeather(dailyPoints(daily.rows, ctx.sites, ctx.windowA, ctx.windowB).points);
     if (!total.ok) return unavailable("H4", "operational_change", `weather regression failed (${total.error})`, [daily.evidence.id]);
     const vW = weatherVolume(total.model, r.pbarA), vOp = r.volume - vW;

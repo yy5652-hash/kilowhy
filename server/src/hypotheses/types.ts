@@ -51,6 +51,9 @@ export interface Decomp {
   warnings: string[];
 }
 
+/** What the hypotheses need from the World Model: the ops_log events of a site in a date range (see worldmodel.ts). */
+export interface WorldEvents { factsFor(site: string, window: { from: string; toExclusive: string }): { eventId: string }[] }
+
 export interface HypCtx {
   scope: Scope;
   sites: string[];
@@ -59,6 +62,7 @@ export interface HypCtx {
   decomposition: Decomp;
   data: DataLayer;
   evidence: EvidenceStore;
+  world?: WorldEvents;                        // grounded entities (World Model); absent in tests that do not build one
 }
 
 export type { SlotRow };

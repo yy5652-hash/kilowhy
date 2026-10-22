@@ -6,6 +6,7 @@
 // Meter kWh are SAMPLE data.
 import { chat as providerChat } from "./provider.ts";
 import { createZetarisData, type DataLayer, type ZSql } from "./data.ts";
+import { KilowhyWorld } from "./worldmodel.ts";
 import { CATALOG, HYPOTHESIS_IDS } from "./hypotheses/index.ts";
 import type { HypothesisId } from "./hypotheses/types.ts";
 import { WINDOW_A, WINDOW_B, type DateWindow } from "./windows.ts";
@@ -27,6 +28,7 @@ import { SAMPLE_NOTE, type ClarificationResult, type DecompositionSummary, type 
 export interface InvestigateOpts {
   zsql?: ZSql;                    // Zetaris runner: needed for the planner's extra SQL and, without `data`, to build the data layer
   data?: DataLayer;               // default: createZetarisData(zsql)
+  world?: KilowhyWorld;           // the World Model (sites, aliases, ops_log events); default: a new in-memory one, ingested from `data` at the start
   chat?: ChatFn;                  // default: the Meterless/NVIDIA provider
   site?: string;                  // restrict to one site (id or name); overrides the sites found in the question
   windowA?: DateWindow; windowB?: DateWindow;
@@ -89,13 +91,13 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   planP.catch(() => {});
 
   // ---- 1. sites and intent; data work starts on the scope the question text implies, without waiting for the model
-  const info = await timed(emit, timings, "sites", async () => (data.siteInfo ? data.siteInfo() : (await data.siteIds()).map((id) => ({ id, name: id }))));
-  const known: SiteRef[] = info.map((s) => ({ id: s.id, name: s.name || s.id }));
+  const world = opts.world ?? KilowhyWorld.create();
+  const known: SiteRef[] = await timed(emit, timings, "sites", async () => { await world.ingest(data); return world.sites(); });
   const intentP = timed(emit, timings, "intent", () => askJson(env, "intent", "auto", intentMessages(question, known), checkIntent, { maxTokens: INTENT_MAX_TOKENS, deadlineMs: deadline.intent, hedgeAfterMs: hedge.intent }));
   const guess = guessSites(question, known, opts.site);
   const label = (ids: string[]) => (ids.length === known.length ? "ALL" : ids.join("+"));
   const specTimings: Record<string, number> = {};
-  const specP = runScope({ data, siteIds: guess, label: label(guess), windowA, windowB, emit, timings: specTimings });
+  const specP = runScope({ data, siteIds: guess, label: label(guess), windowA, windowB, emit, timings: specTimings, world });
   specP.catch(() => {});
 
   const ir = await intentP;
@@ -113,7 +115,7 @@ export async function investigate(question: string, opts: InvestigateOpts = {}):
   else {
     notes.push(`scope changed from ${label(guess)} to ${scope.label} after the intent; the data work was redone`);
     emit({ type: "reset", reason: `scope is ${scope.label}` });
-    run = await runScope({ data, siteIds: scope.siteIds, label: scope.label, windowA, windowB, emit, timings });
+    run = await runScope({ data, siteIds: scope.siteIds, label: scope.label, windowA, windowB, emit, timings, world });
   }
   const { ctx, results, loadShift, tariff } = run;
   notes.push(...run.notes);

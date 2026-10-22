@@ -25,7 +25,10 @@ export function resolveScope(question: string, intent: Pick<Intent, "requestedSi
     const res = resolveSite(r, known);
     if (res.ok) res.ids.forEach((id) => ids.add(id));
     else if (onlySite || appearsIn(r, question)) {
-      return { ok: false, clarification: res.ambiguous.length > 1 ? `"${r}" matches several sites (${res.ambiguous.join(", ")}). Which one do you mean? Sites: ${listing(known)}.` : `I could not find a site called "${r}". Which one do you mean? Sites: ${listing(known)}.` };
+      const near = res.near?.map((id) => known.find((s) => s.id === id)).filter((s): s is SiteRef => !!s);
+      return { ok: false, clarification: res.ambiguous.length > 1 ? `"${r}" matches several sites (${res.ambiguous.join(", ")}). Which one do you mean? Sites: ${listing(known)}.`
+        : near?.length ? `"${r}" is close to ${near.map((s) => `${s.id} (${s.name})`).join(" and ")}, but not close enough for me to be sure. Which one do you mean? Sites: ${listing(known)}.`
+        : `I could not find a site called "${r}". Which one do you mean? Sites: ${listing(known)}.` };
     } else notes.push(`ignored site "${r}" proposed by the model: it does not appear in the question`);
   }
   const unknownNumbered = onlySite ? [] : unknownNumberedSites(question, known);

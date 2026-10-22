@@ -32,7 +32,7 @@ export interface TariffRow {
 }
 export interface CoverageRow { site: string; win: "A" | "B"; nMeter: number; nPriced: number; nCarbon: number }
 
-export interface SiteInfo { id: string; name: string }
+export interface SiteInfo { id: string; name: string; postcode?: string; region?: string; mpanLabel?: string; zetarisRunId?: string }   // postcode, region and mpanLabel: SAMPLE site data, for the World Model; zetarisRunId: the run of the sites query
 export interface DataLayer {
   siteIds(): Promise<string[]>;
   /** Site ids with their display names (kilowhy.sites). Optional: the agent falls back to the ids as names. */
@@ -76,7 +76,7 @@ const rangeSql = (col: string, w: Windows): string =>
 const winSql = (col: string, w: Windows): string => `CASE WHEN ${col} >= ${dateLit(w.A.from)} AND ${col} < ${dateLit(w.A.toExclusive)} THEN 'A' ELSE 'B' END`;
 
 export const sitesSql = (): string => `SELECT site_id FROM kilowhy.sites ORDER BY site_id`;
-export const siteInfoSql = (): string => `SELECT site_id, name FROM kilowhy.sites ORDER BY site_id`;
+export const siteInfoSql = (): string => `SELECT site_id, name, postcode, region, mpan_label FROM kilowhy.sites ORDER BY site_id`;
 
 export const slotsSql = (sites: string[], w: Windows): string =>
   `SELECT m.site_id, m.ts, ${winSql("m.ts", w)} AS win, m.kwh, r.p_kwh_inc_vat AS p, c.forecast_gco2_kwh AS intensity, c.wind_pct, c.gas_pct, c.imports_pct\n` +
@@ -176,7 +176,7 @@ export function createZetarisData(zsql: ZSql): DataLayer {
       const sqls = [slotsSql(q.sites, q.windows), dailySql(q.sites, q.windows), opsLogSql(q.sites), contractSql(), qualitySql(q.sites, q.windows), coverageSql(q.sites, q.windows), tariffSql(q.sites, q.windows)];
       await Promise.allSettled(sqls.map((sql) => run(sql)));
     },
-    async siteInfo() { return (await run(siteInfoSql())).rows.map((r) => ({ id: str(r.site_id), name: str(r.name) })); },
+    async siteInfo() { const q = await run(siteInfoSql()); return q.rows.map((r) => ({ id: str(r.site_id), name: str(r.name), postcode: str(r.postcode), region: str(r.region), mpanLabel: str(r.mpan_label), zetarisRunId: q.runId })); },
     slots: (q, meta) => fetched(slotsSql(q.sites, q.windows), [SRC.meter, SRC.rates, SRC.carbon], parseSlot, meta),
     daily: (q, meta) => fetched(dailySql(q.sites, q.windows), [SRC.meter, SRC.temp], parseDaily, meta),
     opsLog: (q, meta) => fetched(opsLogSql(q.sites), [SRC.ops], parseOps, meta),

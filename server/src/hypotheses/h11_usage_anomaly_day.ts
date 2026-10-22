@@ -6,7 +6,7 @@ import type { OpsEvent } from "../data.ts";
 import type { Hypothesis, Status } from "./types.ts";
 import { THRESHOLDS as T } from "./thresholds.ts";
 import { dailyPoints, fitWeather, type DayPoint } from "./weather.ts";
-import { fetchMeta, metricMap, result, round, unavailable } from "./util.ts";
+import { addWorldEvents, fetchMeta, metricMap, result, round, unavailable } from "./util.ts";
 
 export interface DayAnomaly {
   site: string; date: string; win: "A" | "B"; kwh: number; expected: number; residual: number; z: number;
@@ -47,6 +47,7 @@ export const H11: Hypothesis = {
     const win = { A: ctx.windowA, B: ctx.windowB };
     const daily = await ctx.data.daily({ sites: ctx.sites, windows: win }, fetchMeta(ctx, "H11", `Daily kWh and mean temperature (${ctx.scope.label})`));
     const ops = await ctx.data.opsLog({ sites: ctx.sites }, fetchMeta(ctx, "H11", `ops_log events (${ctx.scope.label})`));
+    addWorldEvents(ctx, ops.evidence.id);
     const scan = scanAnomalies(ctx.sites.map((site) => ({ site, points: dailyPoints(daily.rows, [site], ctx.windowA, ctx.windowB).points })), ops.rows);
     if (scan.siteDays === 0) return unavailable("H11", "usage_anomaly_day", `weather model failed for ${scan.failedSites.join(", ") || "all sites"}`, [daily.evidence.id, ops.evidence.id]);
     const status = decideH11(scan);

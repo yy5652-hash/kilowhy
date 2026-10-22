@@ -5,7 +5,7 @@ import { bandShares } from "./analysis.ts";
 import { loadSlots } from "./context.ts";
 import { BAND_NAMES } from "../bands.ts";
 import { analyseSchedule, type ScheduleShift } from "./schedule_shift.ts";
-import { fetchMeta, gbp, metricMap, pctText, result, round, signed, signedGbp, unavailable } from "./util.ts";
+import { addWorldEvents, fetchMeta, gbp, metricMap, pctText, result, round, signed, signedGbp, unavailable } from "./util.ts";
 
 /** supported if |T| >= 10% of |dC|, else ruled_out (binary, as in the spec). */
 export function decideH5(timingPence: number, deltaPence: number): { status: Status; share: number } {
@@ -23,6 +23,7 @@ export const H5: Hypothesis = {
     const r = d.result;
     const { evidence: ev, aligned, rows } = await loadSlots(ctx, "H5", `kWh share per time band and timing effect (${ctx.scope.label})`);
     const ops = await ctx.data.opsLog({ sites: ctx.sites }, fetchMeta(ctx, "H5", `ops_log events (${ctx.scope.label})`));
+    addWorldEvents(ctx, ops.evidence.id);
     const g = decideH5(r.timing, r.deltaTotal);
     const sa = bandShares(aligned.A), sb = bandShares(aligned.B);
     const m: Record<string, [number | string | boolean | null, string]> = { timing_T: [gbp(r.timing), "GBP"], timing_share_of_delta: [g.share, "ratio"] };

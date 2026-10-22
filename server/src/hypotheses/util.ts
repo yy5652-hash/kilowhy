@@ -15,6 +15,14 @@ export const metricMap = (m: Record<string, [MetricValue["value"], string]>): Re
 
 export const fetchMeta = (ctx: HypCtx, hypothesisId: string, title: string): FetchMeta => ({ store: ctx.evidence, hypothesisId, title });
 
+/** World Model cross-check on the ops_log evidence (H4, H5, H11): how many events the world holds for the scope's sites across both windows. Same Zetaris source, so it should equal events_in_scope. */
+export function addWorldEvents(ctx: HypCtx, evidenceId: string): void {
+  if (!ctx.world) return;
+  const world = ctx.world, span = { from: ctx.windowA.from, toExclusive: ctx.windowB.toExclusive };
+  const n = ctx.sites.reduce((sum, site) => sum + world.factsFor(site, span).length, 0);
+  ctx.evidence.addMetrics(evidenceId, metricMap({ world_model_events_in_windows: [n, "events"] }));
+}
+
 /** Decision for an effect that must reach `threshold` x |dC| in the direction of dC. */
 export function gradeEffect(effectPence: number, deltaPence: number, threshold: number): { status: Status; share: number; signedEffect: number } {
   const dir = Math.sign(deltaPence);

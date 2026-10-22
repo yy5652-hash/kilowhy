@@ -1,52 +1,10 @@
-// Entity resolution for the agent (spec step 1): sites by id, number ("site 2") or fuzzy name; ALL; deterministic fallback intent; output slug.
+// Entity helpers for the agent (spec step 1): numbered-site checks, deterministic fallback intent, output slug.
+// Site resolution itself (ids, numbers, names, aliases, ALL) is the World Model's: see worldmodel_resolve.ts (re-exported here).
 // Unknown sites are never guessed: the caller turns an unresolved name into a clarification.
 import type { IntentType } from "./agent_types.ts";
+import { norm, type SiteRef } from "./worldmodel_resolve.ts";
 
-export interface SiteRef { id: string; name: string }
-const STOP = new Set(["crumb", "the", "and", "site", "sites", "shop", "branch", "store", "bakery", "bakeries", "our", "my", "all", "every", "london"]);
-const norm = (s: string): string => s.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
-const words = (s: string): string[] => norm(s).split(" ").filter(Boolean);
-
-function distance(a: string, b: string): number {
-  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)] as number[]);
-  for (let j = 1; j <= b.length; j++) d[0][j] = j;
-  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-  return d[a.length][b.length];
-}
-const wordsMatch = (x: string, y: string): boolean => x === y || (x.length >= 5 && y.length >= 5 && distance(x, y) <= 1);
-
-export const ALL_RE = /^(all( (the|our|of the))?( sites| shops| bakeries| branches| stores)?|every ?(site|shop|bakery|branch|store)?|everything|the whole business|whole business|the business|our business|company|all)$/;
-
-export const isAllRequest = (request: string): boolean => ALL_RE.test(norm(request));
-
-export type Resolution = { ok: true; ids: string[] } | { ok: false; ambiguous: string[] };
-
-/** One requested site string -> site ids. ALL -> every site; "S2" / "site 2" / "2" -> S2; "Brixton" (also misspelt) -> the site whose name has that word. */
-export function resolveSite(request: string, known: SiteRef[]): Resolution {
-  const n = norm(request);
-  if (ALL_RE.test(n)) return { ok: true, ids: known.map((s) => s.id) };
-  const byId = known.find((s) => norm(s.id) === n);
-  if (byId) return { ok: true, ids: [byId.id] };
-  const num = n.match(/^(?:site|shop|branch|bakery|store)?\s*(?:no |number |#)?(\d+)$/)?.[1];
-  if (num) { const hit = known.find((s) => norm(s.id) === `s${num}`); if (hit) return { ok: true, ids: [hit.id] }; }
-  const want = words(request).filter((w) => !STOP.has(w) && w.length >= 3);
-  const hits = known.filter((s) => want.length > 0 && words(s.name).filter((w) => !STOP.has(w) && w.length >= 3).some((nw) => want.some((w) => wordsMatch(w, nw))));
-  if (hits.length === 1) return { ok: true, ids: [hits[0].id] };
-  return { ok: false, ambiguous: hits.map((s) => s.id) };
-}
-
-/** Sites the question text mentions by id ("S2", "site 2") or by a distinctive word of the name ("Brixton"). Used when the model forgot to list them. */
-export function mentionedSites(question: string, known: SiteRef[]): string[] {
-  const q = norm(question);
-  const qWords = words(question);
-  const found = new Set<string>();
-  for (const s of known) {
-    const num = s.id.match(/\d+/)?.[0];
-    if (new RegExp(`(^| )${norm(s.id)}( |$)`).test(q) || (num && new RegExp(`(^| )(site|shop|branch|bakery|store) (no |number )?${num}( |$)`).test(q))) found.add(s.id);
-    else if (words(s.name).filter((w) => !STOP.has(w) && w.length >= 3).some((nw) => qWords.some((w) => wordsMatch(w, nw)))) found.add(s.id);
-  }
-  return [...found];
-}
+export { resolveSite, mentionedSites, isAllRequest, ALL_RE, type SiteRef, type Resolution } from "./worldmodel_resolve.ts";
 
 /** "site 9" / "shop no. 9" in the question when no such site exists: a numbered mention is never silently widened to all sites. */
 export function unknownNumberedSites(question: string, known: SiteRef[]): string[] {
