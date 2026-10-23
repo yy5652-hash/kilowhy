@@ -1,6 +1,6 @@
 import type { InvestigationResult } from "../types";
 import costMore from "./why-did-our-electricity-cost-more-in-the-last-four.json";
-import brixton from "./why-did-brixton-use-more-electricity.json";
+import brixton from "./why-did-brixton-use-more-electricity-s2.json";
 import saveMoney from "./what-should-we-change-to-save-money.json";
 
 export interface FixtureEntry {
@@ -16,7 +16,7 @@ export const FIXTURES: FixtureEntry[] = [
     result: costMore as unknown as InvestigationResult,
   },
   {
-    slug: "why-did-brixton-use-more-electricity",
+    slug: "why-did-brixton-use-more-electricity-s2",
     question: "Why did Brixton use more electricity?",
     result: brixton as unknown as InvestigationResult,
   },

@@ -18,6 +18,8 @@ interface Props {
   recalledIds?: string[];
   /** Changes when a new answer arrives, so the list picks up the findings it wrote. */
   refreshKey?: string;
+  /** Without the API (replay), the notes the current answer recalled, taken from the saved answer. */
+  offlineNotes?: MemoryRecord[];
 }
 
 function siteLabel(sites: { id: string; name: string }[], id?: string): string {
@@ -51,7 +53,7 @@ function provenanceLabel(p: unknown): string | null {
   return null;
 }
 
-export function MemoryPanel({ site, sites, apiOnline, focus, recalledIds = [], refreshKey }: Props) {
+export function MemoryPanel({ site, sites, apiOnline, focus, recalledIds = [], refreshKey, offlineNotes = [] }: Props) {
   const bodyId = useId();
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState<MemoryRecord[]>([]);
@@ -68,8 +70,9 @@ export function MemoryPanel({ site, sites, apiOnline, focus, recalledIds = [], r
 
   const load = useCallback(async () => {
     if (!apiOnline) {
-      setNotes([]);
-      setError("The memory API is unreachable in offline demo mode.");
+      setNotes(offlineNotes);
+      setError(offlineNotes.length ? null : "This saved answer recalled no notes.");
+      setLoaded(true);
       return;
     }
     try {
@@ -83,7 +86,7 @@ export function MemoryPanel({ site, sites, apiOnline, focus, recalledIds = [], r
     } finally {
       setLoaded(true);
     }
-  }, [apiOnline]);
+  }, [apiOnline, offlineNotes]);
 
   useEffect(() => {
     if (open) void load();
@@ -213,18 +216,18 @@ export function MemoryPanel({ site, sites, apiOnline, focus, recalledIds = [], r
                         {recalled && <span className="recalled-tag">recalled in this answer</span>}
                         <span title="When the memory was learned">learned {fmtDate(n.learnedAt)}</span>
                         {n.validFrom && <span title="The date it applies from">valid from {fmtDate(n.validFrom)}</span>}
-                        <span title="Confidence">confidence {(n.confidence * 100).toFixed(0)}%</span>
+                        {Number.isFinite(n.confidence) && <span title="Confidence">confidence {(n.confidence * 100).toFixed(0)}%</span>}
                       </div>
                       <p className="memory-text">{n.text}</p>
                       {prov && <p className="muted small memory-prov">Source: {prov}</p>}
-                      <button
+                      {apiOnline && <button
                         type="button"
                         className="text-btn audit-toggle"
                         aria-expanded={auditOpen}
                         onClick={() => void toggleAudit(n.id)}
                       >
                         {auditOpen ? "Hide audit trail" : "Audit trail"}
-                      </button>
+                      </button>}
                       {audit === "loading" && <p className="muted small">Loading ledger…</p>}
                       {audit === "error" && <p className="muted small">Audit trail not available.</p>}
                       {Array.isArray(audit) && (
@@ -248,7 +251,7 @@ export function MemoryPanel({ site, sites, apiOnline, focus, recalledIds = [], r
             </div>
           ))}
 
-          <form className="note-form" onSubmit={(e) => void submit(e)}>
+          {apiOnline && <form className="note-form" onSubmit={(e) => void submit(e)}>
             <h3 className="note-form-title">Add a note</h3>
             <label className="site-select compact" htmlFor="note-site">
               <span>Site</span>
@@ -287,7 +290,7 @@ export function MemoryPanel({ site, sites, apiOnline, focus, recalledIds = [], r
                 </p>
               )}
             </div>
-          </form>
+          </form>}
         </div>
       )}
     </section>

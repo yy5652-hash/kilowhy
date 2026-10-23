@@ -1,5 +1,5 @@
 {
-  "note": "Real measurements of scripts/ask.ts, 60 s apart, final D2e code. Before = the committed D2d eval/answers (commit d775782).",
+  "note": "Real measurements of scripts/ask.ts, 60 s apart, final D2e code. Before = the committed D2d eval/answers (commit 6a48e7c).",
   "before": {
     "q1": {
       "question": "Why did our electricity cost more in the last four weeks than the four weeks before?",

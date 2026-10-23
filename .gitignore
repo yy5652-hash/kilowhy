@@ -6,3 +6,4 @@ data/cache/
 *.log
 .DS_Store
 dist/
+web/dist-replay/

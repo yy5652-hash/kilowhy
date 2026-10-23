@@ -12,14 +12,16 @@ interface Props {
   busy: boolean;
   onOpen: (slug: string) => void;
   activeSlug?: string | null;
+  /** List heading. */
+  title: string;
+  /** Live mode keeps earlier answers folded away under the question box. */
+  collapsible?: boolean;
 }
 
-export function RecentAnswers({ answers, busy, onOpen, activeSlug }: Props) {
+export function RecentAnswers({ answers, busy, onOpen, activeSlug, title, collapsible }: Props) {
   if (answers.length === 0) return null;
 
-  return (
-    <section className="recent-answers" aria-label="Recent answers">
-      <h3>Recent answers</h3>
+  const list = (
       <ul>
         {answers.map((a) => (
           <li key={a.slug}>
@@ -47,6 +49,20 @@ export function RecentAnswers({ answers, busy, onOpen, activeSlug }: Props) {
           </li>
         ))}
       </ul>
+  );
+  if (collapsible)
+    return (
+      <details className="recent-answers fold-inline">
+        <summary>
+          {title} ({answers.length})
+        </summary>
+        {list}
+      </details>
+    );
+  return (
+    <section className="recent-answers" aria-label={title}>
+      <h3>{title}</h3>
+      {list}
     </section>
   );
 }

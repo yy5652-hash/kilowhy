@@ -1938,3 +1938,86 @@ button.cite:hover {
     height: 2.75rem;
   }
 }
+
+/* Folded cards: the title row stays visible, the detail opens on click */
+.fold {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 0.85rem 1.2rem;
+}
+
+.fold > summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+}
+
+.fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold > summary::before {
+  content: "▸";
+  color: var(--ink-muted);
+}
+
+.fold[open] > summary::before {
+  content: "▾";
+}
+
+.fold[open] > summary {
+  margin-bottom: 0.9rem;
+}
+
+.fold-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.fold-hint {
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+}
+
+/* inside a fold, the section's own card frame and heading give way to the fold's */
+.fold > section,
+.fold > footer {
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  background: none;
+}
+
+.fold > section > h2:first-child,
+.fold > footer > h2:first-child {
+  display: none;
+}
+
+.recent-answers.fold-inline > summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.recent-answers.fold-inline > summary::-webkit-details-marker {
+  display: none;
+}
+
+.recent-answers.fold-inline > summary::before {
+  content: "▸ ";
+  color: var(--ink-muted);
+}
+
+.recent-answers.fold-inline[open] > summary::before {
+  content: "▾ ";
+}
+
+.recent-answers.fold-inline[open] > summary {
+  margin-bottom: 0.6rem;
+}

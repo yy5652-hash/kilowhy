@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   askQuestion,
   fetchAnswer,
@@ -8,7 +8,7 @@ import {
 } from "./api/client";
 import { AnswerCard } from "./components/AnswerCard";
 import { EvidenceDrawer } from "./components/EvidenceDrawer";
-import { Header } from "./components/Header";
+import { Header, type ViewMode } from "./components/Header";
 import { HowAnswerMade } from "./components/HowAnswerMade";
 import { HowItWorks } from "./components/HowItWorks";
 import { MemoryPanel, type MemoryFocus } from "./components/MemoryPanel";
@@ -30,8 +30,24 @@ import type {
   Evidence,
   InvestigateOutcome,
   InvestigationResult,
+  MemoryRecord,
 } from "./types";
 import { isClarification } from "./types";
+
+const MAIN_SLUG = "why-did-our-electricity-cost-more-in-the-last-four";
+
+/** A folded card: the title stays visible, the detail opens on click. */
+function Fold({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  return (
+    <details className="fold">
+      <summary>
+        <span className="fold-title">{title}</span>
+        {hint && <span className="fold-hint">{hint}</span>}
+      </summary>
+      {children}
+    </details>
+  );
+}
 
 type Theme = "light" | "dark";
 
@@ -93,6 +109,13 @@ export default function App() {
         setApiOnline(true);
         setOfflineDemo(false);
         await refreshRecent();
+        if (!s.zetaris.ok) {
+          const a = await fetchAnswer(MAIN_SLUG).catch(() => null);
+          if (a && !cancelled) {
+            setResult(a);
+            setActiveSlug(MAIN_SLUG);
+          }
+        }
       } catch {
         if (cancelled) return;
         setApiOnline(false);
@@ -223,11 +246,21 @@ export default function App() {
   );
 
   const drawerEvidence = drawerId ? evidenceMap.get(drawerId) ?? null : null;
+  const mode: ViewMode = offlineDemo || !apiOnline ? "replay" : status?.zetaris.ok ? "live" : "saved";
+  const timelineShown = busy || timeline.evidence.length > 0 || timeline.llmCalls.length > 0;
+  const offlineNotes = useMemo<MemoryRecord[]>(
+    () =>
+      (result?.memory?.recalled ?? []).map((m) => ({
+        id: m.id, text: m.text, relevance: m.relevance, origin: m.origin, site: m.site,
+        learnedAt: m.learnedAt, confidence: Number.NaN, layer: "recalled",
+      })),
+    [result],
+  );
 
   return (
     <div className="app">
       <div className="top-bar">
-        <Header status={status} offline={offlineDemo} />
+        <Header status={status} mode={mode} />
         <button
           type="button"
           className="theme-toggle"
@@ -239,29 +272,39 @@ export default function App() {
       </div>
 
       <main className="main">
-        <OfflineNotice show={offlineDemo} />
-        <QuestionBox
-          question={question}
-          site={site}
-          sites={sites}
-          busy={busy}
-          onQuestion={setQuestion}
-          onSite={setSite}
-          onAsk={() => void onAsk()}
-        />
+        <OfflineNotice mode={mode} />
+        {mode === "live" && (
+          <QuestionBox
+            question={question}
+            site={site}
+            sites={sites}
+            busy={busy}
+            onQuestion={setQuestion}
+            onSite={setSite}
+            onAsk={() => void onAsk()}
+          />
+        )}
 
         <RecentAnswers
           answers={recent}
           busy={busy}
           activeSlug={activeSlug}
           onOpen={(slug) => void onOpenRecent(slug)}
+          title={mode === "live" ? "Earlier answers" : "Saved answers"}
+          collapsible={mode === "live"}
         />
 
-        <Timeline
-          state={timeline}
-          visible={busy || timeline.evidence.length > 0 || timeline.llmCalls.length > 0}
-          onOpenEvidence={openEvidence}
-        />
+        {timelineShown &&
+          (busy ? (
+            <Timeline state={timeline} visible onOpenEvidence={openEvidence} />
+          ) : (
+            <Fold
+              title="Investigation"
+              hint={`${timeline.evidence.length} queries · ${timeline.llmCalls.length} model calls${timeline.doneMs ? ` · ${(timeline.doneMs / 1000).toFixed(0)} s` : ""}`}
+            >
+              <Timeline state={timeline} visible onOpenEvidence={openEvidence} />
+            </Fold>
+          ))}
 
         {error && (
           <p className="error-banner" role="alert">
@@ -279,9 +322,11 @@ export default function App() {
         {result && (
           <>
             <AnswerCard result={result} onEvidence={openEvidence} onMemory={focusMemory} />
-            <RuledOut items={result.answer.ruledOut} onEvidence={openEvidence} />
             <RecommendationCard result={result} onEvidence={openEvidence} />
-            <HowAnswerMade result={result} apiOnline={apiOnline} onMemory={focusMemory} />
+            <RuledOut items={result.answer.ruledOut} onEvidence={openEvidence} />
+            <Fold title="How this answer was made" hint="models, compute receipts, memory, timings">
+              <HowAnswerMade result={result} apiOnline={apiOnline} onMemory={focusMemory} />
+            </Fold>
           </>
         )}
 
@@ -292,10 +337,13 @@ export default function App() {
           focus={memoryFocus}
           recalledIds={result?.memory?.recalled.map((m) => m.id) ?? []}
           refreshKey={result?.generatedAt}
+          offlineNotes={offlineNotes}
         />
       </main>
 
-      <HowItWorks />
+      <Fold title="How it works" hint="Zetaris · Meterless · NVIDIA Nemotron · Cursor">
+        <HowItWorks />
+      </Fold>
 
       <EvidenceDrawer
         evidence={drawerEvidence}

@@ -6,7 +6,7 @@ The raw data is in `eval/latency/` (`runs_d2e.json`, `reasoning_probe*.json`); m
 
 ## Result
 
-Each question was run twice, 60 s apart, on the final code (`scripts/ask.ts`). "Before" is the committed D2d run (`eval/answers/*.json` at commit d775782).
+Each question was run twice, 60 s apart, on the final code (`scripts/ask.ts`). "Before" is the committed D2d run (`eval/answers/*.json` at commit 6a48e7c).
 
 | question | before total | before narrative (attempts) | after run 1 | after run 2 | median | narrative attempts (run 1 / 2) | mode (run 1 / 2) |
 |---|---|---|---|---|---|---|---|

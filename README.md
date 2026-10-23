@@ -6,9 +6,24 @@ Kilowhy is an agent for small businesses on half-hourly electricity tariffs. The
 
 Built for the **Open Agent Hackathon 2026**, Track 02 "The Agent That Can Explain Why". It uses Zetaris, Meterless (Nightshift plus the H-MEM, World Model and Markovian engines) and NVIDIA Nemotron, and the UI was built with Cursor.
 
-Demo video: [youtu.be/_sTPlIU6pKM](https://youtu.be/_sTPlIU6pKM) · Slides: [docs/Kilowhy-slides.pdf](docs/Kilowhy-slides.pdf)
+Demo video: [youtu.be/_sTPlIU6pKM](https://youtu.be/_sTPlIU6pKM) · Try it in the browser: [yy5652-hash.github.io/kilowhy](https://yy5652-hash.github.io/kilowhy/) · Slides: [docs/Kilowhy-slides.pdf](docs/Kilowhy-slides.pdf)
 
 ![A live Kilowhy answer: headline, verified badge, waterfall and evidence chips](docs/screenshots/03-answer.png)
+
+## Review it in two minutes
+
+- **Watch** the [3:38 demo](https://youtu.be/_sTPlIU6pKM): two live runs, the evidence drawer, the memory recall and the evaluation.
+- **Click through, nothing to install:** [yy5652-hash.github.io/kilowhy](https://yy5652-hash.github.io/kilowhy/) replays three saved real runs (all three bakeries; Brixton with a recalled owner note; what to change). Every evidence chip opens the SQL that Zetaris ran, and *How this answer was made* lists each model call with its Nightshift receipt.
+- **Read** the [evaluation report](eval/results/eval_report.md) and the saved answers in [`eval/answers/`](eval/answers/).
+- **Run the UI on the saved answers** with Node 24 only:
+
+  ```bash
+  git clone https://github.com/yy5652-hash/kilowhy && cd kilowhy
+  (cd web && npm ci && npm run build)
+  node server/src/http.ts        # http://127.0.0.1:5174
+  ```
+
+  Asking new questions needs the full local stack (Zetaris and Nightshift): see [Run it locally](#run-it-locally-macos-apple-silicon).
 
 ## What it does
 

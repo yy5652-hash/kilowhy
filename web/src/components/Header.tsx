@@ -1,21 +1,24 @@
 import type { ApiStatus } from "../types";
 
+export type ViewMode = "live" | "saved" | "replay";
+
 interface Props {
   status: ApiStatus | null;
-  offline: boolean;
+  mode: ViewMode;
 }
 
-export function Header({ status, offline }: Props) {
-  const zetarisOk = status?.zetaris.ok ?? false;
-  const meterless = status?.meterless.status ?? "offline";
-  const meterlessOk = meterless === "online";
-  const meterlessLabel = meterlessOk ? "online" : meterless === "unauthorized" ? "unauthorized" : "offline";
-  const hint = meterlessOk
-    ? null
-    : meterless === "unauthorized"
-      ? "Nightshift did not accept the key; answers fall back to NVIDIA direct, labelled."
-      : "Open Nightshift to use the primary route; answers fall back to NVIDIA direct, labelled.";
+/** One status chip: what this page can do right now. */
+function statusLine(status: ApiStatus | null, mode: ViewMode): { label: string; ok: boolean; title: string } {
+  if (mode === "replay") return { label: "Replay of saved real runs", ok: true, title: "No server here: the answers are bundled real runs" };
+  if (mode === "saved") return { label: "Saved answers · Zetaris not running", ok: false, title: "Start the stack (scripts/start_stack.sh) to ask new questions" };
+  const nightshift = status?.meterless.status === "online";
+  return nightshift
+    ? { label: "Live · Zetaris + Nemotron via Nightshift", ok: true, title: "Every model call goes through Meterless Nightshift" }
+    : { label: "Live · Nightshift offline, NVIDIA fallback", ok: false, title: "Open Nightshift to use the primary route; fallback calls are labelled" };
+}
 
+export function Header({ status, mode }: Props) {
+  const s = statusLine(status, mode);
   return (
     <header className="site-header">
       <div className="brand">
@@ -24,27 +27,12 @@ export function Header({ status, offline }: Props) {
           Ask why your electricity bill changed. Every number is backed by a query.
         </p>
       </div>
-      <div className="status-chips" role="group" aria-label="System status">
-        <span className={`chip ${zetarisOk ? "ok" : "amber"}`}>
+      <div className="status-chips" role="status" aria-label="System status">
+        <span className={`chip ${s.ok ? "ok" : "amber"}`} title={s.title}>
           <span className="chip-dot" aria-hidden />
-          Zetaris · {zetarisOk ? "local" : offline ? "demo" : "unreachable"}
-        </span>
-        <span className={`chip ${meterlessOk ? "ok" : "amber"}`}>
-          <span className="chip-dot" aria-hidden />
-          Meterless Nightshift · {meterlessLabel}
-        </span>
-        <span className={`chip ${meterlessOk ? "ok" : "amber"}`}>
-          <span className="chip-dot" aria-hidden />
-          {meterlessOk
-            ? "Nemotron via Nightshift"
-            : offline
-              ? "Nemotron · saved answers"
-              : status?.fallback.enabled === false
-                ? "Nemotron unavailable"
-                : "Nemotron via NVIDIA direct (fallback)"}
+          {s.label}
         </span>
       </div>
-      {hint && <p className="status-hint">{hint}</p>}
     </header>
   );
 }
