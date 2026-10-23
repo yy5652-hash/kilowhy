@@ -14,8 +14,8 @@ echo "built web/dist-replay"
 
 if [ "${1:-}" = "--publish" ]; then
   remote="$(git remote get-url origin)"
-  email="$(git config user.email)"
-  name="$(git config user.name)"
+  email="$(git log -1 --format=%ae)"   # same author as the main branch
+  name="$(git log -1 --format=%an)"
   (cd web/dist-replay && rm -rf .git && git init -q && git checkout -q -b gh-pages \
     && git -c user.email="$email" -c user.name="$name" add -A \
     && git -c user.email="$email" -c user.name="$name" commit -q -m "Replay build of the Kilowhy UI (saved real answers)" \
