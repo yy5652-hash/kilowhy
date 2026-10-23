@@ -122,6 +122,9 @@ function hasSize(text: string, q: QualityCtx, facts: Fact[]): boolean {
 }
 
 const CUTS = [" — ", " – ", ": ", "; ", ", ", " (", " with ", " driven ", " mainly ", " because ", " while ", " as "];
+/** Drops what a cut can leave hanging at the end ("…, driven", "…, mainly by") together with trailing punctuation. */
+const DANGLING = /(?:[\s,;:—–(-]+(?:driven|mainly|largely|mostly|by|with|and|as|while|because|due|to))+$/i;
+const trimCut = (p: string): string => p.replace(/[\s,;:—–(-]+$/, "").replace(DANGLING, "").replace(/[\s,;:—–(-]+$/, "");
 /** Sentence case, one line, at most 90 characters, with the size of the change; falls back to the deterministic headline. Returns what it did. */
 export function tidyHeadline(raw: string, q: QualityCtx | undefined, facts: Fact[]): { text: string; notes: string[] } {
   const notes: string[] = [];
@@ -133,7 +136,7 @@ export function tidyHeadline(raw: string, q: QualityCtx | undefined, facts: Fact
   if (t.length > HEADLINE_MAX_CHARS) {
     const before = t.length;
     const cuts = CUTS.flatMap((c) => { const out: number[] = []; for (let i = t.indexOf(c); i >= 0; i = t.indexOf(c, i + 1)) out.push(i); return out; }).sort((a, b) => b - a);
-    const ok = cuts.map((i) => t.slice(0, i).replace(/[\s,;:—–(-]+$/, "")).find((p) => p.length <= HEADLINE_MAX_CHARS && p.length >= 20 && hasSize(p, q, facts));
+    const ok = cuts.map((i) => trimCut(t.slice(0, i))).find((p) => p.length <= HEADLINE_MAX_CHARS && p.length >= 20 && hasSize(p, q, facts));
     if (ok) { t = ok; notes.push(`headline was ${before} characters: cut to ${t.length}`); }
   }
   if (t.length > HEADLINE_MAX_CHARS || !hasSize(t, q, facts)) {

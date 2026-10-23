@@ -264,6 +264,11 @@ describe("tidyHeadline", () => {
     assert.ok(r.text.length <= HEADLINE_MAX_CHARS && r.text.includes("£104.67"), r.text);
     assert.match(r.notes[0], /^headline was \d+ characters: cut to \d+$/);
   });
+  it("a cut never leaves a dangling connective such as 'driven' or 'mainly by'", () => {
+    const long = "Your electricity bill rose by £104.67 over the four weeks, driven mainly by higher wholesale prices and colder weather";
+    assert.ok(long.length > HEADLINE_MAX_CHARS);
+    assert.equal(tidyHeadline(long, q, w.facts).text, "Your electricity bill rose by £104.67 over the four weeks");
+  });
   it("a headline that cannot be cut keeps no size, or lacks it: the deterministic headline replaces it", () => {
     assert.equal(q.fallbackHeadline, "Crumb & Co Brixton's electricity bill rose by £104.67 (15.5%)");
     const noSize = tidyHeadline("Prices and weather both pushed the bill up", q, w.facts);
