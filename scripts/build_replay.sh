@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 cp eval/answers/why-did-our-electricity-cost-more-in-the-last-four.json \
    eval/answers/why-did-brixton-use-more-electricity-s2.json \
    eval/answers/what-should-we-change-to-save-money.json web/src/fixtures/
-(cd web && npx tsc --noEmit && npx vite build --base=./ --outDir dist-replay --emptyOutDir)
+(cd web && npx tsc --noEmit && VITE_REPLAY=1 npx vite build --base=./ --outDir dist-replay --emptyOutDir)
 touch web/dist-replay/.nojekyll
 echo "built web/dist-replay"
 

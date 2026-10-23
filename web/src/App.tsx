@@ -35,6 +35,11 @@ import type {
 import { isClarification } from "./types";
 
 const MAIN_SLUG = "why-did-our-electricity-cost-more-in-the-last-four";
+/** The static replay build (GitHub Pages, scripts/build_replay.sh) has no server: it opens straight on the bundled saved answers. */
+const REPLAY = import.meta.env.VITE_REPLAY === "1";
+const OFFLINE_STATUS: ApiStatus = { zetaris: { ok: false, views: 0 }, meterless: { status: "offline", baseUrl: null }, fallback: { enabled: true } };
+const fixtureAnswers = (): AnswerListItem[] =>
+  FIXTURES.map((f) => ({ slug: f.slug, question: f.question, headline: f.result.answer.headline, generatedAt: f.result.generatedAt }));
 
 /** A folded card: the title stays visible, the detail opens on click. */
 function Fold({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
@@ -58,9 +63,9 @@ function preferTheme(): Theme {
 
 export default function App() {
   const [theme, setTheme] = useState<Theme>(preferTheme);
-  const [status, setStatus] = useState<ApiStatus | null>(null);
+  const [status, setStatus] = useState<ApiStatus | null>(REPLAY ? OFFLINE_STATUS : null);
   const [apiOnline, setApiOnline] = useState(false);
-  const [offlineDemo, setOfflineDemo] = useState(false);
+  const [offlineDemo, setOfflineDemo] = useState(REPLAY);
 
   const [question, setQuestion] = useState(SUGGESTED_QUESTIONS[0]);
   const [site, setSite] = useState("ALL");
@@ -68,11 +73,11 @@ export default function App() {
 
   const [busy, setBusy] = useState(false);
   const [timeline, setTimeline] = useState<TimelineState>(emptyTimeline());
-  const [result, setResult] = useState<InvestigationResult | null>(null);
+  const [result, setResult] = useState<InvestigationResult | null>(REPLAY ? FIXTURES[0].result : null);
   const [clarification, setClarification] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [recent, setRecent] = useState<AnswerListItem[]>([]);
-  const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  const [recent, setRecent] = useState<AnswerListItem[]>(REPLAY ? fixtureAnswers() : []);
+  const [activeSlug, setActiveSlug] = useState<string | null>(REPLAY ? FIXTURES[0].slug : null);
 
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [memoryFocus, setMemoryFocus] = useState<MemoryFocus | null>(null);
@@ -88,18 +93,12 @@ export default function App() {
       const list = await fetchAnswers();
       setRecent(list);
     } catch {
-      setRecent(
-        FIXTURES.map((f) => ({
-          slug: f.slug,
-          question: f.question,
-          headline: f.result.answer.headline,
-          generatedAt: f.result.generatedAt,
-        })),
-      );
+      setRecent(fixtureAnswers());
     }
   }, []);
 
   useEffect(() => {
+    if (REPLAY) return;
     let cancelled = false;
     (async () => {
       try {
@@ -120,11 +119,7 @@ export default function App() {
         if (cancelled) return;
         setApiOnline(false);
         setOfflineDemo(true);
-        setStatus({
-          zetaris: { ok: false, views: 0 },
-          meterless: { status: "offline", baseUrl: null },
-          fallback: { enabled: true },
-        });
+        setStatus(OFFLINE_STATUS);
         setResult(FIXTURES[0].result);
         setActiveSlug(FIXTURES[0].slug);
         await refreshRecent();
