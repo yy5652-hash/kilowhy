@@ -22,6 +22,9 @@ export function withReasoning(messages: ChatMessage[], rc?: ReasoningControl): C
   return messages.map((m, i) => (i === 0 && m.role === "system" ? { ...m, content: `${m.content}\n${rc.systemLine}` } : m));
 }
 
+/** KILOWHY_PATIENCE=N (default 1) gives Nightshift N times longer before the hedge and the deadline of every step, so a run can be served by Nightshift alone while it is slow (used to record the demo film). */
+export const PATIENCE = Math.max(1, Number(process.env.KILOWHY_PATIENCE) || 1);
+
 const TRANSIENT = /HTTP 429|HTTP 5\d\d|network error|Too Many Requests/i;
 const QUICK_FAILURE_MS = 20_000;
 const TRANSIENT_PAUSE_MS = 1_500;
@@ -37,7 +40,7 @@ export async function askJson<T>(env: LlmEnv, step: string, mode: Mode, messages
     const t0 = performance.now();
     const record = (c: LlmCall) => { const call = { ...c, wallMs: Math.round(performance.now() - t0) }; env.calls.push(call); env.onCall?.(call); };
     try {
-      res = await env.chat({ mode, messages: withReasoning(msgs, env.reasoning), ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}), ...(opts.deadlineMs ? { deadlineMs: opts.deadlineMs } : {}), ...(opts.hedgeAfterMs ? { hedgeAfterMs: opts.hedgeAfterMs } : {}), ...(opts.direct ? { direct: opts.direct } : {}), ...(env.reasoning?.extra ? { extra: env.reasoning.extra } : {}) });
+      res = await env.chat({ mode, messages: withReasoning(msgs, env.reasoning), ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}), ...(opts.deadlineMs ? { deadlineMs: opts.deadlineMs * PATIENCE } : {}), ...(opts.hedgeAfterMs ? { hedgeAfterMs: opts.hedgeAfterMs * PATIENCE } : {}), ...(opts.direct ? { direct: opts.direct } : {}), ...(env.reasoning?.extra ? { extra: env.reasoning.extra } : {}) });
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
       record({ step: label, error });
