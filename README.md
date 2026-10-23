@@ -6,7 +6,7 @@ Kilowhy is an agent for small businesses on half-hourly electricity tariffs. The
 
 Built for the **Open Agent Hackathon 2026**, Track 02 "The Agent That Can Explain Why". It uses Zetaris, Meterless (Nightshift plus the H-MEM, World Model and Markovian engines) and NVIDIA Nemotron, and the UI was built with Cursor.
 
-Demo video: _link added at submission_ · Slides: [docs/Kilowhy-slides.pdf](docs/Kilowhy-slides.pdf)
+Demo video: [youtu.be/_sTPlIU6pKM](https://youtu.be/_sTPlIU6pKM) · Slides: [docs/Kilowhy-slides.pdf](docs/Kilowhy-slides.pdf)
 
 ![A live Kilowhy answer: headline, verified badge, waterfall and evidence chips](docs/screenshots/03-answer.png)
 
