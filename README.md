@@ -8,7 +8,7 @@ Built for the **Open Agent Hackathon 2026**, Track 02 "The Agent That Can Explai
 
 Demo video: [youtu.be/_sTPlIU6pKM](https://youtu.be/_sTPlIU6pKM) · Try it in the browser: [yy5652-hash.github.io/kilowhy](https://yy5652-hash.github.io/kilowhy/) · Slides: [docs/Kilowhy-slides.pdf](docs/Kilowhy-slides.pdf)
 
-![A live Kilowhy answer: headline, verified badge, waterfall and evidence chips](docs/screenshots/03-answer.png)
+![The Kilowhy dashboard: the bill change split exactly, the biggest driver, weather and the best saving found, with the waterfall and the recommendation](docs/screenshots/09-dashboard.png)
 
 ## Review it in two minutes
 

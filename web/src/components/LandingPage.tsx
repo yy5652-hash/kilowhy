@@ -285,19 +285,6 @@ export function LandingPage({
                   facts={main.facts}
                   onEvidence={show}
                 />
-                <div className="four-drivers">
-                  {[
-                    ["L", "Price"],
-                    ["v_weather", "Weather"],
-                    ["v_operational", "Operations"],
-                    ["T", "Timing"],
-                  ].map(([k, l]) => (
-                    <div key={k}>
-                      <span>{l}</span>
-                      <strong>{f(k)}</strong>
-                    </div>
-                  ))}
-                </div>
               </CardContent>
             </Card>
           </Feature>
