@@ -55,7 +55,7 @@ function provenanceLabel(p: unknown): string | null {
 
 export function MemoryPanel({ site, sites, apiOnline, focus, recalledIds = [], refreshKey, offlineNotes = [] }: Props) {
   const bodyId = useId();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [notes, setNotes] = useState<MemoryRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [noteSite, setNoteSite] = useState(site === "ALL" ? (sites[0]?.id ?? "S1") : site);
@@ -109,7 +109,7 @@ export function MemoryPanel({ site, sites, apiOnline, focus, recalledIds = [], r
     if (!highlightId || !open) return;
     const el = itemRefs.current.get(highlightId);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "center" });
     el.focus({ preventScroll: true });
   }, [highlightId, open, notes, focus]);
 

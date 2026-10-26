@@ -1,76 +1,87 @@
+import { BadgeCheck, BarChart3, FileText } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { InvestigationResult } from "../types";
-import { memoryIdFromChip, recallSummaryLine, sentenceCaseHeadline, shortSiteName } from "../format";
+import { memoryIdFromChip, recallSummaryLine } from "../format";
 import { SentenceWithCites } from "./CitedText";
 import { Waterfall } from "./Waterfall";
-
-interface Props {
+export function AnswerCard({
+  result,
+  onEvidence,
+  onMemory,
+}: {
   result: InvestigationResult;
   onEvidence: (id: string) => void;
-  onMemory?: (memoryId: string) => void;
-}
-
-export function AnswerCard({ result, onEvidence, onMemory }: Props) {
-  const { answer, verification, facts, decomposition, sampleDataNote } = result;
-  const verified = verification.passed && verification.mode === "llm";
-  const template = verification.mode === "template";
-  const recallLine = recallSummaryLine(result);
-  const headline = sentenceCaseHeadline(
-    answer.headline,
-    result.scope.sites.map((x) => shortSiteName(x.name)),
-  );
-
-  const openMemory = (chip: string) => {
-    const id = memoryIdFromChip(facts, chip);
-    if (id) onMemory?.(id);
-  };
-
+  onMemory?: (id: string) => void;
+}) {
+  const { answer, facts, decomposition } = result;
   return (
-    <section className="answer-card" aria-label="Answer">
-      <div className="answer-head">
-        <h2 className={`headline ${headline.length > 110 ? "long" : ""}`}>{headline}</h2>
-        {verified && (
-          <span className="verify-badge ok">Verified: every figure matches its source</span>
-        )}
-        {template && <span className="verify-badge template">Template answer</span>}
-        {!verified && !template && verification.passed === false && (
-          <span className="verify-badge warn">Verification incomplete</span>
-        )}
-      </div>
-
-      {recallLine && (
-        <p className="recall-banner">
-          <span>{recallLine}</span>
-          {result.memory?.recalled.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className="cite cite-m"
-              onClick={() => onMemory?.(m.id)}
-              title={`Open memory ${m.factId}: ${m.text}`}
-            >
-              {m.factId}
-            </button>
-          ))}
-        </p>
-      )}
-
-      <Waterfall decomposition={decomposition} facts={facts} />
-
-      <div className="answer-body">
-        {answer.sentences.map((s, i) => (
-          <SentenceWithCites
-            key={i}
-            text={s.text}
-            evidenceIds={s.evidence}
-            factIds={s.facts}
+    <div className="answer-column">
+      <Card>
+        <CardHeader>
+          <div className="card-heading">
+            <CardTitle>
+              <BarChart3 size={17} />
+              Every pound, accounted for
+            </CardTitle>
+            <span className="muted small">Window A → Window B</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Waterfall
+            decomposition={decomposition}
             facts={facts}
             onEvidence={onEvidence}
-            onMemory={openMemory}
           />
-        ))}
-      </div>
-
-      <p className="sample-note">{sampleDataNote || "Meter kWh are SAMPLE data."}</p>
-    </section>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <FileText size={17} />
+            The answer, with receipts
+          </CardTitle>
+          <p className="muted small">
+            E = query evidence · F = verified fact · M = remembered note
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="answer-body">
+            {answer.sentences.map((s, i) => (
+              <SentenceWithCites
+                key={i}
+                text={s.text}
+                evidenceIds={s.evidence}
+                factIds={s.facts}
+                facts={facts}
+                onEvidence={onEvidence}
+                onMemory={(chip) => {
+                  const id = memoryIdFromChip(facts, chip);
+                  if (id) onMemory?.(id);
+                }}
+              />
+            ))}
+          </div>
+          {recallSummaryLine(result) && (
+            <div className="recall-banner">
+              <BadgeCheck size={16} />
+              {recallSummaryLine(result)}{" "}
+              {result.memory?.recalled.map((m) => (
+                <button
+                  key={m.id}
+                  className="cite cite-m"
+                  onClick={() => onMemory?.(m.id)}
+                >
+                  {m.factId}
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="sample-note">
+            Meter readings: sample data. Prices, weather, carbon and generation:
+            real public data.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

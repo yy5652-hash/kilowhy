@@ -200,7 +200,7 @@ export function HowAnswerMade({ result, apiOnline, onMemory }: Props) {
         )}
       </div>
 
-      <div className="how-block">
+      {apiOnline && <div className="how-block">
         <h3>World model</h3>
         {entityError && <p className="muted small">{entityError}</p>}
         {counts && (
@@ -221,7 +221,7 @@ export function HowAnswerMade({ result, apiOnline, onMemory }: Props) {
             </li>
           </ul>
         )}
-      </div>
+      </div>}
 
       <div className="how-block">
         <h3>Step timings</h3>

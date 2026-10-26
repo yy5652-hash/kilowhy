@@ -1,30 +1,37 @@
+import { CheckCircle2, ChevronRight } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RuledOutItem } from "../types";
-
-interface Props {
+export function RuledOut({
+  items,
+  onEvidence,
+}: {
   items: RuledOutItem[];
   onEvidence: (id: string) => void;
-}
-
-export function RuledOut({ items, onEvidence }: Props) {
-  if (!items.length) return null;
+}) {
   return (
-    <section className="ruled-out" aria-label="Ruled-out causes">
-      <h2>Ruled out</h2>
-      <ul className="ruled-chips">
-        {items.map((item, i) => (
-          <li key={`${item.hypothesis}-${i}`}>
-            <button
-              type="button"
-              className="ruled-chip"
-              onClick={() => item.evidence[0] && onEvidence(item.evidence[0])}
-              title={item.evidence.join(", ")}
-            >
-              <span className="ruled-hyp">{item.hypothesis}</span>
-              <span className="ruled-text">{item.text}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>Ruled out</CardTitle>
+        <p className="muted small">Checked against the evidence.</p>
+      </CardHeader>
+      <CardContent>
+        <ul className="ruled-list">
+          {items.map((item, i) => (
+            <li key={i}>
+              <button
+                onClick={() => item.evidence[0] && onEvidence(item.evidence[0])}
+              >
+                <CheckCircle2 className="text-emerald-600 shrink-0" size={17} />
+                <span>
+                  <span className="mono muted small">{item.hypothesis}</span>
+                  <span className="block">{item.text}</span>
+                </span>
+                <ChevronRight size={14} className="shrink-0" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }

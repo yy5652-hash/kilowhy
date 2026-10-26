@@ -23,8 +23,11 @@ export function QuestionBox({
     <section className="question-box" aria-label="Ask a question">
       <div className="question-head">
         <label htmlFor="question-input">Your question</label>
-        <span className="sample-badge" title="Meter kWh are synthetic sample data">
-          meter data: SAMPLE
+        <span
+          className="sample-badge"
+          title="Meter kWh are synthetic sample data"
+        >
+          Meter readings: sample data
         </span>
       </div>
       <textarea
@@ -41,7 +44,11 @@ export function QuestionBox({
       <div className="question-row">
         <label className="site-select">
           <span>Site</span>
-          <select value={site} disabled={busy} onChange={(e) => onSite(e.target.value)}>
+          <select
+            value={site}
+            disabled={busy}
+            onChange={(e) => onSite(e.target.value)}
+          >
             <option value="ALL">All sites</option>
             {sites.map((s) => (
               <option key={s.id} value={s.id}>
@@ -50,7 +57,12 @@ export function QuestionBox({
             ))}
           </select>
         </label>
-        <button type="button" className="ask-btn" disabled={busy || !question.trim()} onClick={onAsk}>
+        <button
+          type="button"
+          className="ask-btn"
+          disabled={busy || !question.trim()}
+          onClick={onAsk}
+        >
           {busy ? "Investigating…" : "Ask Kilowhy"}
         </button>
       </div>

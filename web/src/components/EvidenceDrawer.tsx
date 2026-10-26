@@ -1,171 +1,180 @@
 import { useEffect, useRef, useState } from "react";
+import { Check, Copy, Database, Fingerprint } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { Evidence } from "../types";
 import { shortSha, sourceBadges } from "../format";
-
-interface Props {
+export function EvidenceDrawer({
+  evidence,
+  open,
+  onClose,
+}: {
   evidence: Evidence | null;
   open: boolean;
   onClose: () => void;
-}
-
-export function EvidenceDrawer({ evidence, open, onClose }: Props) {
-  const [copied, setCopied] = useState(false);
-  const closeRef = useRef<HTMLButtonElement | null>(null);
-  const returnTo = useRef<HTMLElement | null>(null);
-
-  // Move focus into the drawer when it opens and give it back to the chip that opened it.
-  useEffect(() => {
-    if (open) {
-      returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      const t = window.setTimeout(() => closeRef.current?.focus({ preventScroll: true }), 30);
-      return () => window.clearTimeout(t);
-    }
-    returnTo.current?.focus({ preventScroll: true });
-    returnTo.current = null;
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  useEffect(() => {
-    setCopied(false);
-  }, [evidence?.id]);
-
-  const copySql = async () => {
-    if (!evidence) return;
-    try {
-      await navigator.clipboard.writeText(evidence.sql);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* ignore */
-    }
-  };
-
+}) {
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const [copy, setCopy] = useState("");
+  useEffect(() => setCopy(""), [evidence?.id]);
+  const rows = evidence?.sampleRows.slice(0, 5) ?? [];
+  const cols = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
   return (
-    <>
-      <div
-        className={`drawer-backdrop ${open ? "show" : ""}`}
-        onClick={onClose}
-        aria-hidden={!open}
-      />
-      <aside
-        className={`evidence-drawer ${open ? "open" : ""}`}
-        aria-hidden={!open}
-        role="dialog"
-        aria-label="Evidence detail"
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
+      <SheetContent
+        onOpenAutoFocus={() => {
+          returnFocus.current =
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocus.current?.focus({ preventScroll: true });
+        }}
+        className="evidence-sheet w-full sm:max-w-2xl overflow-y-auto p-0"
       >
+        <SheetHeader className="border-b p-6">
+          <div className="eyebrow">
+            <Database size={14} /> QUERY EVIDENCE · {evidence?.id}
+          </div>
+          <SheetTitle className="text-xl pr-5">
+            {evidence?.title ?? "Query evidence"}
+          </SheetTitle>
+          <SheetDescription>
+            The query and results behind this answer.
+          </SheetDescription>
+        </SheetHeader>
         {evidence && (
-          <>
-            <header className="drawer-head">
-              <div>
-                <p className="drawer-id">{evidence.id}</p>
-                <h2>{evidence.title}</h2>
-              </div>
-              <button
-                type="button"
-                className="icon-btn"
-                ref={closeRef}
-                onClick={onClose}
-                aria-label="Close evidence"
-              >
-                ×
-              </button>
-            </header>
-
-            <div className="drawer-badges">
-              {sourceBadges(evidence.sources).map((b) => (
-                <span key={b} className="src-badge">
-                  {b}
-                </span>
+          <div className="evidence-body">
+            <div className="flex flex-wrap gap-2">
+              {sourceBadges(evidence.sources).map((s) => (
+                <Badge variant="secondary" key={s}>
+                  {s}
+                </Badge>
               ))}
-              <span className="src-badge muted">{evidence.hypothesisId}</span>
             </div>
-
-            <div className="drawer-meta">
-              <div>
-                <span className="meta-label">Zetaris run</span>
-                <code>{evidence.zetarisRunId || "—"}</code>
-              </div>
-              <div>
-                <span className="meta-label">Rows</span>
-                <span>{evidence.rowCount}</span>
-              </div>
-              <div>
-                <span className="meta-label">sha256</span>
-                <code title={evidence.resultSha256}>{shortSha(evidence.resultSha256, 12)}</code>
-              </div>
-            </div>
-
-            <div className="sql-block">
-              <div className="sql-head">
-                <span>SQL as sent to Zetaris</span>
-                <button type="button" className="text-btn" onClick={copySql}>
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </div>
-              <pre>
-                <code>{evidence.sql}</code>
-              </pre>
-            </div>
-
-            {Object.keys(evidence.metrics).length > 0 && (
-              <div className="metrics">
-                <h3>Metrics</h3>
-                <dl>
-                  {Object.entries(evidence.metrics).map(([k, m]) => (
-                    <div key={k} className="metric-row">
-                      <dt>{k}</dt>
-                      <dd>
-                        {String(m.value)}
-                        {m.unit ? ` ${m.unit}` : ""}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
+            {evidence.sources.some((s) => s.kind === "FILE: sample") && (
+              <p className="sample-note">Meter readings: sample data</p>
             )}
-
-            {evidence.sampleRows.length > 0 && (
-              <div className="sample-rows">
-                <h3>Sample rows</h3>
-                <div className="table-scroll">
-                  <table>
-                    <thead>
-                      <tr>
-                        {Object.keys(evidence.sampleRows[0]).map((k) => (
-                          <th key={k}>{k}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {evidence.sampleRows.map((row, i) => (
-                        <tr key={i}>
-                          {Object.keys(evidence.sampleRows[0]).map((k) => (
-                            <td key={k}>{formatCell(row[k])}</td>
-                          ))}
-                        </tr>
+            <dl className="evidence-meta">
+              <div>
+                <dt>Zetaris run id</dt>
+                <dd>{evidence.zetarisRunId}</dd>
+              </div>
+              <div>
+                <dt>Rows returned</dt>
+                <dd>{evidence.rowCount.toLocaleString("en-GB")}</dd>
+              </div>
+              <div>
+                <dt>
+                  <Fingerprint size={13} /> SHA-256
+                </dt>
+                <dd title={evidence.resultSha256}>
+                  {shortSha(evidence.resultSha256, 20)}
+                </dd>
+              </div>
+            </dl>
+            <div className="flex items-center justify-between gap-2">
+              <h3>Read-only SQL</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(evidence.sql);
+                    setCopy("Copied");
+                  } catch {
+                    setCopy("Copy unavailable. Select the SQL to copy.");
+                  }
+                }}
+              >
+                {copy === "Copied" ? <Check /> : <Copy />}
+                {copy === "Copied" ? "Copied" : "Copy SQL"}
+              </Button>
+            </div>
+            <span className="sr-only" role="status">
+              {copy}
+            </span>
+            <pre className="sql">
+              <code>{evidence.sql}</code>
+            </pre>
+            <h3>Result metrics</h3>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Metric</TableHead>
+                  <TableHead>Value</TableHead>
+                  <TableHead>Unit</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.entries(evidence.metrics).map(([k, v]) => (
+                  <TableRow key={k}>
+                    <TableCell className="whitespace-normal break-all font-mono text-xs">
+                      {k}
+                    </TableCell>
+                    <TableCell>{String(v.value ?? "—")}</TableCell>
+                    <TableCell>{v.unit}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <h3>Sample rows</h3>
+            <p className="muted small">First {rows.length} returned rows.</p>
+            <div className="sample-table">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {cols.map((c) => (
+                      <TableHead key={c}>{c}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r, i) => (
+                    <TableRow key={i}>
+                      {cols.map((c) => (
+                        <TableCell key={c}>
+                          {typeof r[c] === "object"
+                            ? JSON.stringify(r[c])
+                            : String(r[c] ?? "—")}
+                        </TableCell>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <h3>Federated sources</h3>
+            {evidence.sources.map((s) => (
+              <div key={s.view} className="source-line">
+                <code>{s.view}</code>
+                <span>{s.kind}</span>
               </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
-      </aside>
-    </>
+      </SheetContent>
+    </Sheet>
   );
-}
-
-function formatCell(v: unknown): string {
-  if (v === null || v === undefined) return "—";
-  if (typeof v === "number") return Number.isFinite(v) ? String(v) : "—";
-  return String(v);
 }
